@@ -1,0 +1,194 @@
+---
+title: "Identifying whole-blood gene expression after IV BCG in NHP that is associated with protection from Mtb challenge"
+format: html
+editor:
+  renderView: html
+  sourceView: source
+---
+
+## Data
+
+This TB hackday script uses (pre-processed) RNA sequencing data from the following study:
+
+1.  [Liu et al. 2023](https://pubmed.ncbi.nlm.nih.gov/37390827/) (*Cell Rep Med*) **Blood transcriptional correlates of BCG-induced protection against tuberculosis in rhesus macaques**
+
+The animals in that study were also the animals in these two related studies:
+
+1.  [Darrah et al. 2023](https://pubmed.ncbi.nlm.nih.gov/37267955/) (Cell Host Microbe) **Airway T cells are a correlate of i.v. Bacille Calmette-Guerin-mediated protection against tuberculosis in rhesus macaques**
+
+2.  [Darrah et al. 2020](https://pubmed.ncbi.nlm.nih.gov/31894150/) (*Nature*) **Prevention of tuberculosis in macaques after intravenous BCG immunization**
+
+## Background
+
+In the earlier "route" study Darrah et al. (2020) immunized NHP with BCG by varying routes. After 24 weeks the animals were challenged in the lung with Mycobacterium tuberculosis (Mtb). In a follow-up IV BCG "dose" study Darrah et al. (2023) immunized 34 NHP with various doses of intravenously (i.v.) BCG. Again the animals were challenged after 24 weeks with Mtb. The Liu et al. study conducted whole-blood RNA sequencing on samples from NHP in both the Darrah et al. studies.
+
+![Liu et al. 2023 Cell Reports Time Points](assets/liu_et_al_timeline.png)
+
+## Hypotheses for hacking
+
+ - The original manuscript first identified genes that were differentially upregulated after BCG and then looked for association with protection. Can we directly identify genes that are associated with protection? Does the model need adjustment for covariates? e.g., sex, route, dose
+ - Can we use clustering/WGCNA to identify gene modules or GSEA to identify pre-existing gene modules associated with protection?
+ - How well do the genes classify protected and non-protected animals using CV-AUC?
+ - Does baseline expression of the BCG-responsive genes associate with protection? 
+
+## Setup R and load the data.
+
+Load relevant packages. Change `<data_dir>` variable as appropriate.
+
+Load the pre-processed RNA sequencing data. There are two important files:
+
+1.  `liu_et_al_counts.csv` contains log-transformed/normalized counts that were computed from raw counts by the study authors using DESEQ2 variance stabilizing transform (`vst`). This should be appropriately distributed for limma as well. The table contains 312 columns, with one column `gene` and the remaining columns matching `sampleid`s in the metadata. There are 22,496 genes in the dataset.
+
+2.  `liu_etal_meta.csv` contains all the 29 sample-level metadata that is available for these samples and animals including `sampleid`, `studyid`, `animalid`, `visit`, `route`, `dose_group`, `log_mtb_cfu`, and `protect_outcome`.
+
+```{r}
+#| warning: false
+library(readr)
+library(tidyverse)
+library(edgeR)
+library(kimma)
+library(ggplot2)
+library(dplyr)
+library(ggrepel)
+
+# NOTE --- REPLACE the <data_dir> FOLDER DESTINTATION AS APPROPRIATE
+# data_dir <- 'X:/fast/gilbert_p/fg_data/SEATRAC/TB_hackday_2024/processed_data'
+data_dir <- '/fh/fast/gilbert_p/fg_data/SEATRAC/TB_hackday_2024/processed_data'
+
+ncts <- readr::read_csv(file.path(data_dir, "liu_etal_counts.csv"))
+meta <- readr::read_csv(file.path(data_dir, "liu_etal_metadata.csv"))
+
+```
+
+## Prepare the data for differential gene expression analysis
+
+The `sampleid` columns of the `ncts` variable and the rows of `sampleid` in the `meta` variable match. For this first analysis we will focus on the NHP that received high-dose IV BCG and the blood from 2 weeks after immunization, creating subset tables indicated by `_ss` variables. Then we initialize the `DGEList` object and create a `limma` `voom` model with a design matrix to identify genes that are associated with protection.
+
+In the accompanying "mean-variace" plot the x-axis represents the average expression levels of genes across all samples. The y-axis represents the square-root of the variance (i.e., standard deviation) of gene expression levels. It shows how the variance changes with respect to the mean expression. Every dot is a gene and the trend line shows the relationship between the mean and the variance. Note that the variance is relatively stable across expression levels and the relationship is smooth; this is good for analysis and `voom` will use this relationship to adjust the model fits of each gene. If you re-run the code block without the filtering you will see the impact on the mean-variance plot.
+
+```{r}
+#| fig-width: 5
+#| fig-height: 3
+
+# Focus initial analysis on high-dose IV BCG group and the pre-vaccine time point
+meta_ss = meta %>% filter(vax_group == "IV-HD" & visit == "wk2")
+keep_ids = meta_ss %>% pull(sampleid)
+keep_ids = c('gene', keep_ids)
+
+ncts_ss = ncts %>% select(any_of(keep_ids))
+
+# Discard genes that have low counts/prevalence
+filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))
+ncts_ss = ncts_ss[filter, ]
+
+# Create the object for differential expression testing
+dge_o = DGEList(counts=ncts_ss,
+                genes=ncts_ss[, 1],
+                samples=meta_ss,
+                group=meta_ss[['protect_outcome']])
+
+# Specify the model/design matrix
+design_temp = model.matrix(~protect_outcome + sex, data=meta_ss)
+
+# Create the voom object and fit the model
+v <- voom(dge_o, design=design_temp, plot=TRUE)
+
+```
+
+## Fit the model to identify genes associated with protection
+
+```{r}
+# vvwts <- voomWithQualityWeights(dge_o, design=design_temp, normalize.method="none", plot=TRUE)
+fit = lmFit(v, design_temp)
+
+# Estimate contrasts and p-values
+fit = eBayes(fit, robust=TRUE)
+
+summary(decideTests(fit, adjust.method="fdr", p.value = 0.05))
+
+results <- topTable(fit, adjust="BH", coef="protect_outcomeprotected", p.value=1, number=Inf, resort.by="P")
+
+head(results %>% select(gene, logFC, AveExpr, P.Value, adj.P.Val), 20)
+```
+
+## Create a volcano plot for single-gene association with protection
+
+```{r}
+#| fig-width: 5
+#| fig-height: 3
+
+# Add a column for significance based on FDR
+results <- results %>%
+  mutate(Significance = ifelse(adj.P.Val < 0.05, "Significant", "Not Significant"))
+
+# Select the top 10 genes based on adjusted p-value for labeling
+top_genes <- results %>%
+  arrange(adj.P.Val) %>%
+  slice_head(n = 10)
+
+max_logFC <- max(abs(results$logFC), na.rm = TRUE)
+
+# Create the volcano plot
+volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
+  geom_point(aes(color = Significance), alpha = 0.6) +
+  scale_color_manual(values = c("Significant" = "red", "Not Significant" = "grey")) +
+  geom_text_repel(data = top_genes,
+                  aes(label = gene),
+                  max.overlaps = 10,
+                  box.padding = 0.3,
+                  point.padding = 0.3,
+                  segment.color = "grey50",
+                  size = 3) +
+  xlim(c(-max_logFC, max_logFC)) +
+  theme_minimal() +
+  labs(
+       x = "log2 Fold-change",
+       y = "-log10 P-value",
+       color = "FDR < 0.05") +
+  theme(plot.title = element_text(hjust = 0.5))
+volcano_plot
+```
+
+## Redo the analysis using a mixed-effects model to incorporate data from additional visits and account for the longitudinal design
+
+```{r}
+meta_ss = meta %>% filter(vax_group == "IV-HD" & (visit == "wk2" | visit == "d2"))
+keep_ids = meta_ss %>% pull(sampleid)
+keep_ids = c('gene', keep_ids)
+
+ncts_ss = ncts %>% select(any_of(keep_ids))
+
+# Discard genes that have low counts/prevalence
+filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))
+ncts_ss = ncts_ss[filter, ]
+
+dge_o = DGEList(counts=ncts_ss,
+                genes=ncts_ss[, 1],
+                samples=meta_ss,
+                group=meta_ss[['protect_outcome']])
+
+design_temp=model.matrix(~protect_outcome + sex + visit, data=meta_ss)
+
+v <- voom(dge_o, design=design_temp, plot=FALSE)
+
+# Can't figure out why I get this error here
+# lme/lmerel model: expression~protect_outcome+sex+visit+(1|animalid)
+# Error in `[.data.frame`(weights.format, order(rownames(weights.format)),  : 
+#                           undefined columns selected
+
+#klm <- kmFit(dat = v,
+#             model = "~protect_outcome + sex + visit + (1|animalid)",
+#             run_lme = TRUE,
+#             libraryID="sampleid",
+#             patientID="animalid",
+#             use_weights = TRUE,
+#             metrics = TRUE,
+#             run_contrast = FALSE,
+#             processors=1)
+
+#summarise_kmFit(fdr = klm$lm)
+
+#plot_volcano(model_result = klm, 
+#             model = "lm", variables = "protect_outcomeprotected",
+#             y_cutoff = 0.05)
+```
