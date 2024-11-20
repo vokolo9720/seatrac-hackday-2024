@@ -1,0 +1,176 @@
+---
+title: "Can the adaptive responses to IV BCG be predicted from baseline or early-BCG gene expression in whole-blood?"
+format: html
+editor:
+  renderView: html
+  sourceView: source
+---
+
+## Data
+
+This TB hackday script uses (pre-processed) RNA sequencing data from Liu et al. and immune response data from Darrah et al. for NHP that were immunized using IV BCG:
+
+1.  [Liu et al. 2023](https://pubmed.ncbi.nlm.nih.gov/37390827/) (*Cell Rep Med*) **Blood transcriptional correlates of BCG-induced protection against tuberculosis in rhesus macaques**
+
+
+2.  [Darrah et al. 2023](https://pubmed.ncbi.nlm.nih.gov/37267955/) (Cell Host Microbe) **Airway T cells are a correlate of i.v. Bacille Calmette-Guerin-mediated protection against tuberculosis in rhesus macaques**
+
+
+## Background
+
+With these studies, 34 NHPs were immunized with various doses of intravenous (i.v.) BCG. The animals were challenged after 24 weeks with Mtb. The Darrah et al. study measured immune responses from the animals after BCG and recorded challenge outcomes. The Liu et al. study conducted whole-blood RNA sequencing on samples at the pre, d2, wk2, wk4 and wk12 time points.
+
+
+![Liu et al. 2023 Cell Reports Time Points](assets/liu_et_al_timeline.png)
+
+Darrah et al. found that several immune responses measured from BAL/lung including CD4 T cells, NK cells, and PPD-specific IgA. Many of the responses covary, making it difficult to discern which response correlates most strongly. Liu et al. found that gene expression of specific modules *after* IV BCG were correlated with both the adaptive immune responses, as well as protection.
+
+![Darrah et al. 2023, Figure 6](assets/darrah_2023_fig6.jpg)
+
+## Hypotheses for hacking
+
+ - Are there specific pairs of immune responses or gene module scores that are significantly better at predicting the challenge outcome? Use CV-AUC to evaluate models. What model works best for combining features for prediction of outcome?
+ - While the original study focused on post-BCG gene expression as correlates of immune response and protection, it may be interesting to see how baseline gene expression is associated with immune responses or protection.
+ - If you use alternative outcomes, for example number of granulomas or total CFU, are there different modules or immune responses that are better associated with outcome? Are there any features that are associated consistently with all outcomes?
+
+## Setup R and load the data.
+
+Load relevant packages. Change `<data_dir>` variable as appropriate.
+
+Load the imune response data, the pre-processed RNA sequencing data and the NHP meta-data. There are three important files:
+
+1.  `liu_et_al_counts.csv` contains log-transformed/normalized counts that were computed from raw counts by the study authors using DESEQ2 variance stabilizing transform (`vst`). This should be appropriately distributed for limma as well. The table contains 312 columns, with one column `gene` and the remaining columns matching `sampleid`s in the metadata. There are 22,496 genes in the dataset.
+
+2.  `liu_etal_meta.csv` contains all the 29 sample-level metadata that is available for these samples and animals including `sampleid`, `studyid`, `animalid`, `visit`, `route`, `dose_group`, `log_mtb_cfu`, and `protect_outcome`.
+
+```{r}
+#| warning: false
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(stats)
+library(multcomp) # For FDR adjustment
+
+# NOTE --- REPLACE the <data_dir> FOLDER DESTINTATION AS APPROPRIATE
+# Define the project folder and file paths
+data_dir <- file.path("/fh/fast/gilbert_p/fg_data", "SEATRAC", "TB_hackday_2024", "processed_data")
+
+meta_fn <- file.path(data_dir, "liu_etal_metadata.csv")
+module_fn <- file.path(data_dir, "liu_etal_modules.csv")
+cts_fn <- file.path(data_dir, "liu_etal_counts_long.csv")
+immune_fn <- file.path(data_dir, "darrah_dose_immune_markers.csv")
+
+# Load the data
+meta <- readr::read_csv(meta_fn)
+modules <- readr::read_csv(module_fn)
+ncts <- readr::read_csv(cts_fn)
+
+# Load immune data and rename 'subjid' to 'animalid'
+imm <- readr::read_csv(immune_fn) %>%
+  rename(animalid = subjid)
+
+```
+
+
+```{r}
+
+# Merge module names with the gene count data
+# This allows us to compute module scores for each module
+ncts <- ncts %>%
+  left_join(modules, by = "gene", relationship = "many-to-many")
+
+# Compute module scores (average expression of genes in each module using log2-counts)
+mod_scores <- ncts %>%
+  group_by(sampleid, module) %>%
+  summarise(count = mean(count, na.rm = TRUE), .groups = "drop") %>%
+  left_join(meta, by = "sampleid")
+
+mod_scores <- mod_scores %>%
+  mutate(visit = factor(visit, levels = c("pre", "d2", "wk2", "wk4", "wk12")))
+
+# Quick plot of module scores by visit pre/post-BCG
+ggplot(mod_scores, aes(x = module, y = count, fill = visit)) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("pre" = "blue", "d2" = "red", "wk2" = "green", "wk4" = "purple", "wk12" = "orange")) +
+  labs(title = "Module Scores by Visit", x = "Module", y = "Average Expression") +
+  theme_minimal()
+
+```
+
+```{r}
+#| warning: false
+
+# Estimate how M1 module scores at day 2 correlate with various immune responses
+mod <- "M1"
+mod_visit <- "d2" # Options ['pre', 'd2', 'wk2', 'wk4', 'wk12']
+
+# Filter immune response data to match module scores and calculate correlations
+results <- imm %>%
+  group_by(key) %>%
+  group_map(~ {
+    test_df <- mod_scores %>%
+      filter(module == mod, visit == mod_visit) %>%
+      inner_join(.x, by = "animalid") %>%
+      drop_na(value, count)
+    
+    if (nrow(test_df) > 0) {
+      rho <- cor(test_df$count, test_df$value, method = "spearman")
+      pvalue <- cor.test(test_df$count, test_df$value, method = "spearman")$p.value
+      tibble(
+        module = mod,
+        mod_visit = mod_visit,
+        imm_key = unique(.y$key),
+        n = nrow(test_df),
+        rho = rho,
+        pvalue = pvalue
+      )
+    } else {
+      tibble(
+        module = mod,
+        mod_visit = mod_visit,
+        imm_key = unique(.y$key),
+        n = 0,
+        rho = NA,
+        pvalue = NA
+      )
+    }
+  }) %>%
+  bind_rows()
+
+# Adjust p-values for multiple testing (FDR correction)
+results <- results %>%
+  mutate(fdrq = p.adjust(pvalue, method = "fdr"))
+
+# Sort results by p-value and display the top 20
+results <- results %>%
+  arrange(pvalue)
+
+# View the results
+results %>%
+  slice_head(n = 20)
+
+```
+
+```{r}
+# Example correlation scatter plot
+mod <- "M1"
+mod_visit <- "d2"
+imm_key <- "PBMC/Mtb300 Marginal/CD4/CD154 12"
+
+plot_df <- mod_scores %>%
+  filter(module == mod, visit == mod_visit) %>%
+  inner_join(imm %>% filter(key == imm_key), by = "animalid") %>%
+  drop_na(value, count)
+
+# Plot the data
+gg = ggplot(plot_df, aes(x = count, y = value, color = protect_outcome)) +
+  geom_point() +
+  labs(
+    x = paste(mod, "score at", mod_visit, "visit"),
+    y = imm_key
+  ) + 
+  theme_bw()
+gg
+```
