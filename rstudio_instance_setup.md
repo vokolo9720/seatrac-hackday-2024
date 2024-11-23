@@ -36,19 +36,21 @@ docker exec -it hackday_rstudio /bin/bash
 
 Login to the container and down load the latest code repos, create system users for RStudio and download the data. Order is important: create users then copy PAM profile. Restarting the RStudio service may help if users are not recognized. See PAM in this doc for help: [RStudio Server Admin Guide](https://s3.amazonaws.com/rstudio-server/rstudio-server-pro-0.98.1074-admin-guide.pdf). Users may need to chwd("/home") to see all the files.
 
+The Rstudio server is reachable via HTTP (not HTTPS) using http://[IPv4 address]:8787
+
 ```
 cd /home
-git clone https://github.com/FredHutch/seatrac-hackday-2023.git
+git clone https://github.com/FredHutch/seatrac-hackday-2024.git
 git clone https://github.com/agartland/hackday-rstudio.git
 
-python3 hackday-rstudio/create_users.py seatrac-hackday-2023/roster.users.csv
+python3 hackday-rstudio/create_users.py seatrac-hackday-2024/roster.users.csv
 cat /etc/passwd
 cp /etc/pam.d/login /etc/pam.d/rstudio
 
-mkdir /home/bigdata
-wget https://figshare.com/ndownloader/articles/24425053/versions/3 -O /home/bigdata/bigdata.zip
-cd /home/bigdata
-unzip bigdata.zip
+mkdir /home/processed_data
+wget https://figshare.com/ndownloader/articles/27774420/versions/2 -O /home/processed_data/processed_data.zip
+cd /home/processed_data
+unzip processed_data.zip
 ```
 
 It may be helpful to stop and restart the RStudio server at some point.
@@ -72,8 +74,8 @@ sudo yum update -y
 sudo yum -y install docker
 sudo service docker start
 sudo usermod -a -G docker ec2-user
-chkconfig docker on
-docker pull afioregartland/hackday-rstudio
+sudo chkconfig docker on
+sudo docker pull afioregartland/hackday-rstudio
 ```
 
 ## Other useful `docker` bits
