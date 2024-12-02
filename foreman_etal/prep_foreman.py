@@ -107,3 +107,70 @@ print(res.summary())
 
 sns.jointplot(data=mdf, x='logCFU', y=gene)
 print(stats.spearmanr(mdf['logCFU'], mdf[gene]))
+
+"""Load Bromley data"""
+import pandas as pd
+from os.path import join as opj
+import numpy as np
+import statsmodels.formula.api as smf
+from scipy import stats
+import sys
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+processed_folder = opj(r'C:\Andrew', 'fg_data', 'processed_data')
+
+#fman = pd.read_csv(opj(processed_folder, 'foreman_etal_counts.csv'))
+#fmeta = pd.read_csv(opj(processed_folder, 'foreman_etal_counts.csv'))
+
+cd4_genes = ['KLRB1', 'CD40LG', 'S100A11', 'S100A4', 'IL26', 'BATF']
+cd8_genes = ['APOBEC3G', 'IFNG', 'TNF', 'CCL1','CCL20']
+
+brom = pd.read_csv(opj(processed_folder, 'bromley_coarse_pseudobulk_counts.csv'))
+bmeta = pd.read_csv(opj(processed_folder, 'bromley_coarse_pseudobulk_counts.meta.csv'))
+bmeta = bmeta.rename(columns={'CFU Total ':'CFU'})
+bmeta = bmeta.assign(logCFU=np.log10(bmeta['CFU'] + 1))
+
+sns.distplot(bmeta[['biosample_id', 'logCFU']].drop_duplicates()['logCFU'])
+
+def _prepare_ss(gene):
+    ss = brom.loc[brom['gene'] == gene]
+    tot = ss.groupby(['biosample_id'])['counts'].agg('sum').reset_index().rename(columns={'counts':'tot'})
+    ss = pd.merge(ss, tot, how='left', on='biosample_id')
+    ss = pd.merge(ss, bmeta, how='left', on=['biosample_id', 'CoarseClustering'])
+    ss = ss.assign(lcpm=np.log2((ss['counts'] + 0.01) / ss['tot']),
+                   cpm=ss['counts'] / ss['tot'])
+    return ss
+
+
+res = []
+for g in cd4_genes + cd8_genes:
+    ss = _prepare_ss(g)
+    for clust in ss['CoarseClustering'].unique():
+        tmp = ss.loc[ss['CoarseClustering'] == clust]
+        rho, pvalue = stats.spearmanr(tmp['cpm'], tmp['logCFU'])
+        res.append(dict(gene=g,
+                        cluster=clust,
+                        n=tmp.shape,
+                        rho=rho,
+                        pvalue=pvalue))
+res = pd.DataFrame(res).sort_values(by='pvalue')
+
+gene, clust = res.iloc[3][['gene', 'cluster']]
+
+ss = _prepare_ss(gene)
+"""Note that the DataFrame does not include every gene for every cluster, nor every cluster in every granuloma.
+In other words, the 0s are missing."""
+
+figh = plt.figure(figsize=(10, 8))
+sns.boxplot(data=ss, y='CoarseClustering', x='cpm', hue='Group', fliersize=0)
+sns.stripplot(data=ss, y='CoarseClustering', x='cpm', hue='Group', dodge=True, size=1, linewidth=.5)
+plt.xlabel(f'{gene} expression (log2-CPM)')
+
+
+figh = plt.figure(figsize=(6, 5))
+sns.scatterplot(data=ss.loc[ss['CoarseClustering'] == clust], x='cpm', y='logCFU')
+plt.xlabel(f'{gene} expression in {clust}\n(log2-CPM)')
