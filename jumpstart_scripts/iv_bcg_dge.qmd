@@ -75,7 +75,7 @@ meta_ss = meta %>% filter(vax_group == "IV-HD" & visit == "wk2")
 keep_ids = meta_ss %>% pull(sampleid)
 keep_ids = c('gene', keep_ids)
 
-ncts_ss = ncts %>% select(any_of(keep_ids))
+ncts_ss = ncts %>% dplyr::select(any_of(keep_ids))
 
 # Discard genes that have low counts/prevalence
 filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))
@@ -108,7 +108,7 @@ summary(decideTests(fit, adjust.method="fdr", p.value = 0.05))
 
 results <- topTable(fit, adjust="BH", coef="protect_outcomeprotected", p.value=1, number=Inf, resort.by="P")
 
-head(results %>% select(gene, logFC, AveExpr, P.Value, adj.P.Val), 20)
+head(results %>% dplyr::select(gene, logFC, AveExpr, P.Value, adj.P.Val), 20)
 ```
 
 ## Create a volcano plot for single-gene association with protection
@@ -156,7 +156,7 @@ meta_ss = meta %>% filter(vax_group == "IV-HD" & (visit == "wk2" | visit == "d2"
 keep_ids = meta_ss %>% pull(sampleid)
 keep_ids = c('gene', keep_ids)
 
-ncts_ss = ncts %>% select(any_of(keep_ids))
+ncts_ss = ncts %>% dplyr::select(any_of(keep_ids))
 
 # Discard genes that have low counts/prevalence
 filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))

@@ -39,13 +39,15 @@ Load the pre-processed RNA sequencing data. There are two important files:
 
 ```{r}
 #| warning: false
-library(readr)
-library(tidyverse)
-library(edgeR)
-library(kimma)
-library(ggplot2)
-library(dplyr)
-library(ggrepel)
+library(dplyr)       # For data manipulation
+library(ggplot2)     # For data visualization
+library(readr)       # For reading CSV/TSV files
+library(tidyr)       # For reshaping data
+library(stats)       # For basic statistical tests
+library(multcomp)    # For multiple comparison corrections
+library(lme4)        # For mixed-effects modeling
+library(broom)       # For tidying model outputs
+library(data.table)  # Efficient data handling
 
 # NOTE --- REPLACE the <data_dir> FOLDER DESTINTATION AS APPROPRIATE
 
@@ -55,6 +57,8 @@ data_dir <- '/fh/fast/gilbert_p/fg_data/SEATRAC/TB_hackday_2024/processed_data'
 ncts <- readr::read_csv(file.path(data_dir, "foreman_etal_counts.csv"))
 meta <- readr::read_csv(file.path(data_dir, "foreman_etal_meta.csv"))
 
+meta <- meta %>%
+  mutate(logCFU = log10(CFU + 1))
 ```
 
 ## Prepare the data for differential gene expression analysis
@@ -71,7 +75,7 @@ meta_ss = meta %>% filter(condition == "CD8_gran")
 keep_ids = meta_ss %>% pull(sampleid)
 keep_ids = c('gene_id', keep_ids)
 
-ncts_ss = ncts %>% select(any_of(keep_ids))
+ncts_ss = ncts %>% dplyr::select(any_of(keep_ids))
 
 # Discard genes that have low counts/prevalence
 filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))
@@ -106,7 +110,7 @@ summary(decideTests(fit, adjust.method="fdr", p.value = 0.05))
 
 results <- topTable(fit, adjust="BH", coef="CFU", p.value=1, number=Inf, resort.by="P")
 
-head(results %>% select(gene_id, logFC, AveExpr, P.Value, adj.P.Val), 20)
+head(results %>% dplyr::select(gene_id, logFC, AveExpr, P.Value, adj.P.Val), 20)
 ```
 
 ## Create a volcano plot for single-gene association with protection
@@ -185,3 +189,268 @@ v <- voom(dge_o, design=design_temp, plot=FALSE)
 #             model = "lme", variables = "CFU",
 #             y_cutoff = 0.05)
 ```
+
+```{r}
+# Section 4: Filter genes for analysis
+# ------------------------------------
+ltpm <- ncts %>%
+  column_to_rownames("gene_id") %>%
+  filter(rowMeans(. > 1) > 0.6)
+
+genes <- rownames(ltpm)
+
+# Merge metadata and log-transformed counts
+meta_ss <- meta %>%
+  filter(condition %in% c("CD4_gran", "CD4_PBMC")) %>%
+  column_to_rownames("sampleid")
+
+# Ensure `ltpm` only includes columns for the filtered samples
+ltpm_ss <- ltpm %>%
+  select(all_of(rownames(meta_ss)))
+
+mdf <- meta_ss %>%
+  rownames_to_column("sampleid") %>%
+  bind_cols(t(ltpm_ss))  # Ensure samples (columns of ltpm) match rows of meta
+
+# Section 5: Mann-Whitney U Test for Gene Associations
+# ----------------------------------------------------
+
+collect_res <- function(gene) {
+    gran_expr <- mdf %>%
+      filter(condition == "CD4_gran") %>%
+      pull(gene)
+    pbmc_expr <- mdf %>%
+      filter(condition == "CD4_PBMC") %>%
+      pull(gene)
+    
+    test <- wilcox.test(gran_expr, pbmc_expr)
+    mean_diff <- mean(gran_expr) - mean(pbmc_expr)
+    
+    list(
+      gene = gene,
+      pvalue = test$p.value,
+      stat = test$statistic,
+      assoc = ifelse(mean_diff > 0, "GRAN", "PBMC")
+    )
+    }
+
+results <- lapply(genes, collect_res)
+
+results_df <- bind_rows(results) %>%
+  arrange(pvalue) %>%
+  mutate(FDRq = p.adjust(pvalue, method = "fdr"))
+
+
+# Convert mdf to a matrix for gene expression data
+expression_data <- as.matrix(mdf %>% select(all_of(genes)))
+conditions <- mdf$condition
+
+# Precompute the grouping indices for faster subsetting
+gran_idx <- which(conditions == "CD4_gran")
+pbmc_idx <- which(conditions == "CD4_PBMC")
+
+# Vectorized function to compute statistics for all genes
+collect_res_matrix <- function(expression_data, gran_idx, pbmc_idx, genes) {
+      gran_expr <- expression_data[gran_idx, , drop = FALSE]
+      pbmc_expr <- expression_data[pbmc_idx, , drop = FALSE]
+      
+      # Perform Wilcoxon tests in bulk
+      pvalues <- apply(expression_data, 2, function(gene_expr) {
+        wilcox.test(gene_expr[gran_idx], gene_expr[pbmc_idx])$p.value
+      })
+      
+      # Calculate mean differences
+      mean_gran <- colMeans(gran_expr, na.rm = TRUE)
+      mean_pbmc <- colMeans(pbmc_expr, na.rm = TRUE)
+      mean_diff <- mean_gran - mean_pbmc
+      
+      # Assign "GRAN" or "PBMC" based on the mean difference
+      assoc <- ifelse(mean_diff > 0, "GRAN", "PBMC")
+      
+      # Combine results into a data frame
+      results <- data.frame(
+        gene = genes,
+        pvalue = pvalues,
+        assoc = assoc,
+        stringsAsFactors = FALSE
+      )
+      
+      return(results)
+    }
+
+# Run the matrix-optimized function
+results_df <- collect_res_matrix(expression_data, gran_idx, pbmc_idx, genes)
+
+# Adjust p-values for multiple comparisons
+results_df <- results_df %>%
+  mutate(FDRq = p.adjust(pvalue, method = "fdr")) %>%
+  arrange(pvalue)
+
+print(head(results_df, 20))
+
+# Section 6: Correlation with CFU Using OLS Models
+# ------------------------------------------------
+
+cd4_genes <- c("KLRB1", "CD40LG", "S100A11", "S100A4", "IL26", "BATF")
+cd8_genes <- c("APOBEC3G", "IFNG", "TNF", "CCL1", "CCL20")
+
+sig_genes <- results_df %>%
+  filter(FDRq < 0.1) %>%
+  pull(gene)
+
+cfu_res <- lapply(sig_genes, function(gene) {
+  formula <- as.formula(paste("logCFU ~", gene))
+  model <- lm(formula, data = mdf)
+  summary <- summary(model)
+  
+  conf_int <- confint(model)
+  rho <- cor(mdf$logCFU, mdf[[gene]], method = "spearman")
+  pvalue_corr <- cor.test(mdf$logCFU, mdf[[gene]], method = "spearman")$p.value
+  
+  list(
+    gene = gene,
+    est = summary$coefficients[gene, "Estimate"],
+    est_lb = conf_int[gene, 1],
+    est_ub = conf_int[gene, 2],
+    pvalue = summary$coefficients[gene, "Pr(>|t|)"],
+    rho = rho,
+    corr_pvalue = pvalue_corr
+  )
+})
+
+cfu_res_df <- bind_rows(cfu_res) %>%
+  arrange(pvalue) %>%
+  mutate(FDRq = p.adjust(pvalue, method = "fdr"))
+
+print(head(cfu_res_df, 20))
+
+# Section 8: Visualization
+# ------------------------
+# Scatterplot of Gene Expression vs. CFU
+gene <- "TNFRSF4"
+ggplot(mdf, aes_string(x = "logCFU", y = gene)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ x) +
+  labs(
+    title = paste("Correlation of", gene, "with logCFU"),
+    x = "logCFU",
+    y = paste("Expression of", gene)
+  ) +
+  theme_minimal()
+
+# Boxplot of Gene Expression by Condition
+ggplot(mdf, aes_string(x = "condition", y = gene)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.2, alpha = 0.7) +
+  labs(
+    title = paste("Expression of", gene, "by Condition"),
+    x = "Condition",
+    y = paste("Expression of", gene)
+  ) +
+  theme_minimal()
+```
+
+```{r}
+# Load Bromley data
+brom <- read_csv(file.path(data_dir, "bromley_coarse_pseudobulk_counts.csv"))
+bmeta <- read_csv(file.path(data_dir, "bromley_coarse_pseudobulk_counts.meta.csv"))
+
+# Rename columns for consistency
+bmeta <- bmeta %>%
+  rename(CFU = `CFU Total`) %>%
+  mutate(logCFU = log10(CFU + 1))
+
+# Visualize distribution of logCFU
+ggplot(bmeta, aes(x = logCFU)) +
+  geom_density(fill = "blue", alpha = 0.3) +
+  labs(title = "Distribution of logCFU", x = "logCFU", y = "Density") +
+  theme_minimal()
+
+# Define function to preprocess gene-specific data
+prepare_ss <- function(gene) {
+  ss <- brom %>% filter(gene == !!gene)  # Subset for the specific gene
+  tot <- ss %>%
+    group_by(biosample_id) %>%
+    summarize(tot = sum(counts), .groups = "drop")
+  
+  ss <- ss %>%
+    left_join(tot, by = "biosample_id") %>%
+    left_join(bmeta, by = c("biosample_id", "CoarseClustering")) %>%
+    mutate(
+      lcpm = log2((counts + 0.01) / tot),
+      cpm = counts / tot
+    )
+  
+  return(ss)
+}
+
+# Perform Spearman correlation for CD4 and CD8 genes
+cd4_genes <- c("TNFRSF4", "KLRB1", "CD40LG", "S100A11", "S100A4", "IL26", "BATF")
+cd8_genes <- c("APOBEC3G", "IFNG", "TNF", "CCL1", "CCL20")
+
+gene_list <- c(cd4_genes, cd8_genes)
+
+res <- lapply(gene_list, function(g) {
+  ss <- prepare_ss(g)
+  unique_clusters <- unique(ss$CoarseClustering)
+  
+  cluster_res <- lapply(unique_clusters, function(clust) {
+    tmp <- ss %>% filter(CoarseClustering == clust)
+    
+    # Calculate Spearman correlation
+    cor_res <- cor.test(tmp$cpm, tmp$logCFU, method = "spearman")
+    data.frame(
+      gene = g,
+      cluster = clust,
+      n = nrow(tmp),
+      rho = cor_res$estimate,
+      pvalue = cor_res$p.value
+    )
+  })
+  
+  do.call(rbind, cluster_res)
+})
+
+# Combine results into a single data frame
+res_df <- do.call(rbind, res) %>%
+  arrange(pvalue) %>%
+  mutate(FDRq = p.adjust(pvalue, method = "fdr"))
+
+print(res_df)
+
+# Extract the top gene and cluster
+top_gene <- res_df$gene[1]
+top_cluster <- res_df$cluster[1]
+
+# Prepare data for visualization
+ss <- prepare_ss(top_gene)
+
+# Ensure Group has the specified ordering
+ss <- ss %>%
+  mutate(Group = factor(Group, levels = c("IgG", "antiCD4", "Naïve")))
+
+# Visualization: Boxplot with stripplot overlay
+ggplot(ss, aes(x = cpm, y = CoarseClustering, color = Group)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(position = position_jitterdodge(jitter.width = 0.2), alpha = 0.7) +
+  labs(
+    title = paste("Expression of", top_gene, "by Coarse Clustering"),
+    x = paste(top_gene, "expression (log2-CPM)"),
+    y = "Coarse Clustering"
+  ) +
+  theme_minimal()
+
+
+# Visualization: Scatterplot of cpm vs logCFU for the top cluster
+ss_top <- ss %>% filter(CoarseClustering == top_cluster)
+
+ggplot(ss_top, aes(x = cpm, y = logCFU)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(
+    title = paste("Scatterplot of", top_gene, "expression in", top_cluster),
+    x = paste(top_gene, "expression (log2-CPM)"),
+    y = "logCFU"
+  ) +
+  theme_minimal()
+  ```
