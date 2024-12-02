@@ -60,7 +60,7 @@ sns.boxplot(data=mod_scores,
 mod = 'M1'
 mod_visit = 'd2' #options ['pre', 'd2', 'wk2', 'wk12', 'wk4']
 # imm_visit = 4 # wk4 but this is encoded in the key
-key = 'Lg+ Marginal/CD4/IFNg Abs 4'
+key = 'Lg+ Marginal/CD4/IFNg Abs 4' 
 
 results = []
 for key in imm.key.unique():
@@ -84,3 +84,18 @@ results = results.assign(fdrq=sm.stats.multipletests(results['pvalue'].fillna(1)
 results.head(20)
 
 
+"""Example correlation scatter plot"""
+mod = 'M1'
+mod_visit = 'd2'
+imm_key = 'PBMC/Mtb300 Marginal/CD4/CD154 12'
+
+
+plot_df = pd.merge(mod_scores.loc[(mod_scores['module'] == mod) & (mod_scores['visit'] == mod_visit)],
+                      imm.loc[imm['key'] == imm_key],
+                      how='inner',
+                      on='animalid')
+plot_df = plot_df.dropna(subset=['value', 'count'])
+
+sns.scatterplot(data=plot_df, x='count', y='value', hue='protect_outcome')
+plt.xlabel(f'{mod} score at {mod_visit} visit')
+plt.ylabel(imm_key)
