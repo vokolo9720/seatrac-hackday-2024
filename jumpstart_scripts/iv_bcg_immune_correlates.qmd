@@ -1,6 +1,6 @@
 ---
 title: "Exploring immune responses to i.v. BCG and protection from subsequent Mtb Challenge"
-format: pdf
+format: html
 editor: source
 ---
 
@@ -27,12 +27,7 @@ require(tibble)
 require(dplyr)
 require(readr)
 require(ggplot2)
-# NOTE --- REPLACE the <data_dir> FOLDER DESTINTATION AS APPROPRIATE
-# data_dir = '/Volumes/fh/fast/gilbert_p/fg_data/SEATRAC/TB_hackday_2024/data'
-data_dir = '/fh/fast/gilbert_p/fg_data/SEATRAC/TB_hackday_2024/processed_data'
-
-#darrah  = file.path(data_dir, "darrah_etal")
-#liu     = file.path(data_dir, "liu_etal")
+data_dir = '/home/processed_data'
 ```
 
 ## Load Data
@@ -41,17 +36,11 @@ Load relevant data tables.
 
 ```{r}
 #| warning: false
-#gex_tbl = readr::read_tsv(file.path(liu,"GSE218270_ivbcg_dosecohort_processed.txt.gz"))
-#rmeta_tbl = readr::read_csv(file.path(liu,"GSE218270_family.soft.csv"))
-#rmeta_tbl <- column_to_rownames(as.data.frame(rmeta_tbl), var = "description")
-#correlates_tbl = readr::read_csv(file.path(liu,"GSE218270_family.soft.csv.immune_correlates.csv"))
-
 gex_tbl = readr::read_tsv(file.path(data_dir,"liu_etal_counts.csv"))
 rmeta_tbl = readr::read_csv(file.path(data_dir,"liu_etal_metadata.csv"))
 rmeta_tbl <- column_to_rownames(as.data.frame(rmeta_tbl), var = "sampleid")
 correlates_tbl = readr::read_csv(file.path(data_dir, "darrah_dose_immune_markers.csv"))
 correlates_tbl = correlates_tbl %>% rename(animalid = subjid)
-
 ```
 
 Table Descriptions
@@ -73,6 +62,7 @@ The protection endpoint is contained in the `rmeta_tbl` table. Check to see if y
 rmeta_tbl$binned_bcg_dose= rmeta_tbl$bcg_dose_log10 %>% cut(., breaks = c(4.5,5,5.5,6.0, 6.5, 7, 8))
 rmeta_tbl %>% 
   group_by(binned_bcg_dose, animalid, protect_outcome) %>%
+  filter(Study == "Dose") %>% # only consider the Dose study, where route is consistently i.v. BCG
   slice(1) %>% # This ensure one row per animal, avoids double counting
   ggplot(., aes(x = binned_bcg_dose , fill = protect_outcome) ) + 
   geom_bar( ) +
@@ -82,7 +72,7 @@ rmeta_tbl %>%
 
 ## Figure 1D
 
-As a first task, consider Figure 1D from Liu et al. 2023. It show the number of cytokine producing CD4 and CD8 T cells sampled from the lungs via BAL (y-axis) versus i.v. BCG dose (x-axis). The median response is shown by the bold colored lines.
+As a first exploration, consider Figure 1D from Liu et al. 2023. It show the number of cytokine producing CD4 and CD8 T cells sampled from the lungs via BAL (y-axis) versus i.v. BCG dose (x-axis). The median response is shown by the bold colored lines.
 
 [![Figure 1D from Liu et al. 2023](assets/liu_fig_1D.png){fig-alt="Liu Figure 1D"}](https://www.sciencedirect.com/science/article/pii/S1931312823001993?via%3Dihub#undfig1)
 
@@ -106,6 +96,7 @@ response_by_dose_plot <- function(var1 = "(L)#CD4:AnyG2T17") {
   # note we group_by subject, and dose bin so we only have one 
   # row per animal.
   data1 = rmeta_tbl %>%
+    filter(Study == "Dose") %>%
     group_by(binned_bcg_dose, animalid, protect_outcome) %>%
     tally() %>% 
     left_join(selected_var1) 
@@ -184,7 +175,7 @@ Notice that a (+) or (-) indicates the presence and absences of cytokines in tha
 
 ### Try this: reuse the code with different variables
 
-With the same code you can explore any of the 100s of variables in the data set. HExplore more the variable in `correlates_tbl` columns and use `<short_key>` to interrogate more variables. For instance,
+With the same code you can explore any of the 100s of variables in the data set. Explore more the variable in `correlates_tbl` columns and use `<short_key>` to interrogate more variables. 
 
 ```{r}
 #| warning: false
@@ -245,16 +236,8 @@ gridExtra::grid.arrange(gg1, gg2, ncol =1)
 
 ### Try this
 
-Change the code to examine other variables. Try "`(L)%CD4:G+2+17-T-"` and `"(L)%CD4:G+2-17-T+"` . What do you notice.
+Change the code above to examine other variables. Try "`(L)%CD4:G+2+17-T-"` and `"(L)%CD4:G+2-17-T+"` . What do you notice?
 
-```{r}
-#| warning: false
-#| fig-width: 6
-#| fig-height: 4
-gg1 =  response_by_dose_protection_plot(var1 =  "(L)%CD4:G+2+17-T-")
-gg2 =  response_by_dose_protection_plot(var1 = "(L)%CD4:G+2-17-T+")
-gridExtra::grid.arrange(gg1, gg2, ncol =1)
-```
 
 ## Data mining for potential associations with protection
 
@@ -294,7 +277,7 @@ diff_function <- function(df, output = "mean"){
 
 ## Compute group differences for every variable
 
-Here we tether tegether the `group_by` , `group_split` and `purrr::map` to apply `test_function()` and `diff_function()` across each group split.
+Here we tether together the `group_by` , `group_split` and `purrr::map` to apply `test_function()` and `diff_function()` across each group split.
 
 ```{r}
 #| warning: false
@@ -322,7 +305,7 @@ diffs_tbl = diffs %>% left_join(key_extra, by = c("variable_name" = "key"))
 
 ## Create volcano style plots
 
-Genrate plots show that show the -log10 p-values from Wilcoxon tests (comparing protected and unprotected groups) on the y-axis and the group difference on the x-axis. Points high and to the right are more likely to be significantly associated with protection. Points high and to the left are more associated with risk. Notice that we facet wrap by tissue source (i.e., Lung vs. Periphery) and by time point. What do blue points to the right suggest? *What might the red points at time point week 0 (i.e., baseline) suggest?*
+Generate plots show that show the -log10 p-values from Wilcoxon tests (comparing protected and unprotected groups) on the y-axis and the group difference on the x-axis. Points high and to the right are more likely to be significantly associated with protection. Points high and to the left are more associated with risk. Notice that we facet wrap by tissue source (i.e., Lung vs. Periphery) and by time point. What do blue points to the right suggest? *What might the red points at time point week 0 (i.e., baseline) suggest?*
 
 ```{r}
 #| warning: false
@@ -350,27 +333,22 @@ diffs_tbl %>%
 
 ### Sort the results to find the variables that distinguish the protected and non-protected groups.
 
-```{r}
-#| warning: false
 
-diffs_tbl %>% 
-  mutate(tissue2 = ifelse(stringr::str_detect(pattern = "ung", string = tissue), 
-                          "Lung", "Periphery")) %>% 
-  filter(tp == 0) %>% 
-  arrange(wilcox_p) %>% 
-  select(short_key, variable_name, mean_ratio, wilcox_p, tissue2, tp )
-```
+Try sorting diffs_tbl to find parameters that differ between teh protected and non protected groups.
+
+You may wish to :
+
+* `filter(tp = 0)` to filter to the pre-BCG timepoint
+* `arrange(wilcox_p)` to sort by p-value
+* `arrange(mean_ratio)` to sort by mean_ratio
 
 ## Baseline a variable associated with risk
 
-Above we note that baseline blood cholesterol was perhaps higher in non-protected monkeys. Look at the cholestrol distribution=
+If you find a variable you wish to compare, you can make a box plot like this
 
-```{r}
-#| warning: false
-#| fig-width: 4
-#| fig-height: 4
-var_name =  "CHOLESTEROL - mg/dL 0"
-x %>% filter(key == var_name ) %>% 
+```
+var_name =  "YOUR VARIABLE"
+diffs_tbl %>% filter(key == var_name ) %>% 
   ggplot(aes(x=protect_outcome, y = value)) + 
   geom_boxplot() + 
   geom_point() + 
@@ -379,41 +357,12 @@ x %>% filter(key == var_name ) %>%
   theme_classic()
 ```
 
-## Try this: Examine cholesterol and protection status longitudinally
 
-Let's see how cholesterol levels are distributed across the dose groups. What do you notice
+## Try this: Examine variable and protection status longitudinally
 
-```{r}
-#| warning: false
-#| fig-width: 6
-#| fig-height: 3
-gg1 =  response_by_dose_protection_plot(var1 = "(P)Chol")
-gg1
-```
+You can also use the  `response_by_dose_protection_plot((var1 = "YOUR_VARIABLE")` 
+function we used above to examine values of an immune variable logitudinally.
 
-## Try this: Examine a baseline variable associated with protection
-
-```{r}
-#| warning: false
-#| fig-width: 4
-#| fig-height: 4
-var_name = "PBMC/Any/CD8/Percent Granzyme B 0"
-x %>% filter(key == var_name) %>% 
-  ggplot(aes(x=protect_outcome, y = value)) + 
-  geom_boxplot() + 
-  geom_point() + 
-  ggpubr::stat_compare_means() + 
-  ylab(var_name) + 
-  theme_classic()
-```
-
-```{r}
-#| warning: false
-#| fig-width: 6
-#| fig-height: 3
-gg1 =  response_by_dose_protection_plot(var1 = "(P)%CD8(Any+):GrzB")
-gg1
-```
 
 # Suggestions
 
@@ -468,23 +417,3 @@ names(gex_tbl)[names(gex_tbl) %in% data1$sample_id]
 2.  [Darrah et al. 2023](https://pubmed.ncbi.nlm.nih.gov/37267955/) (Cell Host Microbe) **Airway T cells are a correlate of i.v. Bacille Calmette-Guerin-mediated protection against tuberculosis in rhesus macaques**
 
 3.  [Liu et al. 2023](https://pmc.ncbi.nlm.nih.gov/articles/PMC10394165/) (*Cell Reports)* **Blood transcriptional correlates of BCG-induced protection against tuberculosis in rhesus macaques**
-
-```{r}
-diffs_tbl %>% 
-  mutate(tissue2 = ifelse(stringr::str_detect(pattern = "ung", string = tissue), 
-                          "Lung", "Periphery")) %>% 
-  #filter(tp == "nAUC") %>% 
-  arrange(mean_ratio) %>% 
-  select(short_key, variable_name, mean_ratio, wilcox_p, tissue2, tp ) %>% 
-  filter(short_key == "(L)%CD4:G+2+17-T-")
-```
-
-```{r}
-
-#| warning: false
-#| fig-width: 6
-#| fig-height: 8
-gg2 =  response_by_dose_protection_plot(var1 = "(L)%CD4:G+2+17-T-")
-gg3 =  response_by_dose_protection_plot(var1 = "(L)#CD4:G+2-17-T+")
-gridExtra::grid.arrange(gg2,gg3, ncol =1)
-```
