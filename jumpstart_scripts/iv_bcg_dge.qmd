@@ -92,7 +92,7 @@ dge_o = DGEList(counts=ncts_ss,
 design_temp = model.matrix(~protect_outcome + sex, data=meta_ss)
 
 # Create the voom object and fit the model
-v <- voom(dge_o, design=design_temp, plot=TRUE)
+v <- voomWithQualityWeights(dge_o, design=design_temp, plot=TRUE)
 
 ```
 
@@ -107,7 +107,6 @@ includes filtering sparsely detected genes.*
 ## Fit the model to identify genes associated with protection
 
 ```{r}
-# vvwts <- voomWithQualityWeights(dge_o, design=design_temp, normalize.method="none", plot=TRUE)
 fit = lmFit(v, design_temp)
 
 # Estimate contrasts and p-values
@@ -193,9 +192,8 @@ dge_o = DGEList(counts=ncts_ss,
 design_temp = model.matrix(~sex, data=meta_ss)
 
 # Create the voom object and fit the model
-v <- voom(dge_o, design=design_temp, plot=TRUE)
+v <- voomWithQualityWeights(dge_o, design=design_temp, plot=TRUE)
 
-# vvwts <- voomWithQualityWeights(dge_o, design=design_temp, normalize.method="none", plot=TRUE)
 fit = lmFit(v, design_temp)
 
 # Estimate contrasts and p-values
@@ -260,26 +258,21 @@ dge_o = DGEList(counts=ncts_ss,
 
 design_temp=model.matrix(~protect_outcome + sex + visit, data=meta_ss)
 
-v <- voom(dge_o, design=design_temp, plot=FALSE)
+v <- voomWithQualityWeights(dge_o, design=design_temp, plot=FALSE)
 
-# Can't figure out why I get this error here
-# lme/lmerel model: expression~protect_outcome+sex+visit+(1|animalid)
-# Error in `[.data.frame`(weights.format, order(rownames(weights.format)),  : 
-#                           undefined columns selected
+klm <- kmFit(dat = v,
+             model = "~protect_outcome + sex + visit + (1|animalid)",
+             run_lme = TRUE,
+             libraryID="sampleid",
+             patientID="animalid",
+             use_weights = TRUE,
+             metrics = TRUE,
+             run_contrast = FALSE,
+             processors=1)
 
-#klm <- kmFit(dat = v,
-#             model = "~protect_outcome + sex + visit + (1|animalid)",
-#             run_lme = TRUE,
-#             libraryID="sampleid",
-#             patientID="animalid",
-#             use_weights = TRUE,
-#             metrics = TRUE,
-#             run_contrast = FALSE,
-#             processors=1)
+summarise_kmFit(fdr = klm$lm)
 
-#summarise_kmFit(fdr = klm$lm)
-
-#plot_volcano(model_result = klm, 
-#             model = "lm", variables = "protect_outcomeprotected",
-#             y_cutoff = 0.05)
+plot_volcano(model_result = klm, 
+             model = "lm", variables = "protect_outcomeprotected",
+             y_cutoff = 0.05)
 ```

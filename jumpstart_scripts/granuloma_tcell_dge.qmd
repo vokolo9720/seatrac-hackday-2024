@@ -18,24 +18,32 @@ Then the expression of these genes can be further examined and validated using p
 
 ## Background
 
-Foreman et al. compared the gene expression of T cells isolated from PBMC vs. T cells from granulomas (n=4 NHP, n=23 granulomas). They identified genes that were associated with granuloma T cells, and specifically identied genes that were correlated with Mtb burden in the granuloma (CFU).
+Foreman et al. compared the gene expression of T cells isolated from PBMC vs. T cells from granulomas (n=4 NHP, n=23 granulomas). They identified genes that were associated with granuloma T cells, and specifically identified genes that were correlated with Mtb burden in the granuloma (CFU).
 
 ![Foreman et al. 2023 Granuloma-associated T cell genes](assets/foreman_jem_fig2.png)
 
+Bromley et al. report on an experiment with three groups of cynomolgus macaques: (1) anti-CD4 treated, Mtb-exposed (n=7), (2) IgG control, Mtb-exposed (n=6), (3) No treatment, Mtb-naive (n=6). Groups (2) and (3) were infected with Mtb, then given an anti-CD4 antibody to deplete CD4+ T cells or an isotype control (IgG) antibody, and finally challenged with a secondary Mtb infection. Group 3 only received a primary Mtb infection. Granulomas were then analyzed using single-cell RNAseq, with 3 NHP from (1) and 2 NHP from (2) and (3) each. We have created pseudo-bulk datasets using two different clusterings of the cells, offering two levels of cell type granularity for analysis: `bromley_X_pseudobulk_counts.csv` where `X` is `coarse` or `subclustering`, with clusters defined by the authors of the manuscript. By analyzing data from primary infection, reinfection, and reinfection-CD4+ T cell-depleted granulomas, they found that the presence of CD4+ T cells during reinfection resulted in a less inflammatory lung milieu characterized by reprogrammed CD8+ T cells, reduced neutrophilia, and blunted type 1 immune signaling among myeloid cells.
+
+![Bromley et al. 2024 CD4+ T cells re-wire granuloma cellularity and regulatory networks to promote immunomodulation following Mtb reinfection](assets/bromley_etal_fig1.jpg)
+
 ## Hypotheses for hacking
 
- - Identify genes that are associated with CD4 or CD8 T cells in granulomas and validate their expression in the clusters of granuloma T cells in the Bromley et al. study.
- - Are there genes associated with low-CFU granulomas in Foreman et al. that validate in Bromley et al.?
+ - Identify genes that are associated with CD4 or CD8 T cells in granulomas and validate their expression in the clusters of granuloma T cells in the Bromley et al. study
+ - Are there genes associated with low-CFU granulomas in Foreman et al. that are also associated with low-CFU granulomas in Bromley et al.?
 
 ## Setup R and load the data.
 
 Load relevant packages. Change `<data_dir>` variable as appropriate.
 
-Load the pre-processed RNA sequencing data. There are two important files:
+Load the pre-processed RNA sequencing data. There are several important files:
 
 1.  `foreman_et_al_counts.csv` contains log2-transformed counts per million (log2-CPM), that were computed from raw counts by the study authors. The table contains 84 columns, with one column `gene_id` and the remaining columns matching `sampleid`s in the metadata. There are 30,689 genes in the dataset.
 
 2.  `foreman_etal_meta.csv` contains all the 83 sample- and granuloma-level metadata that is available for these samples and animals. There are 27 CD8+ T cell samples sorted from granulomas and 31 CD4+ T cell samples sorted from granulomas. Other variables include `subject`, `sort`, `condition`, `sex`, and granuloma `CFU`.
+
+3. `bromley_coarse_pseudobulk_counts.csv` is a long-form table containing counts for 33 granulomas from 7 NHP, with over 25K genes from 15 coarse clusters of cells from the granulomas (44 sub-clusters). There are columns for `biosample_id`, `CoarseClustering`, `counts` and `gene`. Counts are not log-normalized. Psuedo-bulk counts were created by summing the counts across all cells in a cluster for each sample.
+
+4. `bromley_coarse_pseudobulk_counts.meta.csv` contains meta-data that can be joined to the counts data on `biosample_id`. Variables include `donor_id`, `Group`, `CFU` (for the granuloma), and `CoarseClustering`/`SubclusteringV2`. 
 
 ```{r}
 #| warning: false
@@ -51,7 +59,7 @@ library(data.table)  # Efficient data handling
 
 # NOTE --- REPLACE the <data_dir> FOLDER DESTINTATION AS APPROPRIATE
 
-data_dir <- '/fh/fast/gilbert_p/fg_data/SEATRAC/TB_hackday_2024/processed_data'
+data_dir <- '/home/processed_data'
 
 # These are already log2-CPM
 ncts <- readr::read_csv(file.path(data_dir, "foreman_etal_counts.csv"))
@@ -61,46 +69,136 @@ meta <- meta %>%
   mutate(logCFU = log10(CFU + 1))
 ```
 
-## Prepare the data for differential gene expression analysis
+## Identify genes that are associated with granuloma T cells
 
-The `sampleid` columns of the `ncts` variable and the rows of `sampleid` in the `meta` variable match. For this first analysis we will focus on the CD8 T cells sorted from PBMC or granulomas, creating subset tables indicated by `_ss` variables. Then we initialize the `DGEList` object and create a `limma` `voom` model with a design matrix to identify genes that are associated with granuloma Mtb burden (CFU).
+This analysis should match part of the analysis presented in Foremant et al. Figure 1. It's a bit of a strange statistical test because it compares gene expression in each granuloma T cell sort (n=31/27 for CD4/CD8) to gene expression in each PBMC sample (n=4), but we can use a rank-based test to find the genes that are differentially expressed in the two tissues. These will become candidate genes for downstream analysis, so statistical significance is not critical.
 
-In the accompanying "mean-variace" plot the x-axis represents the average expression levels of genes across all samples. The y-axis represents the square-root of the variance (i.e., standard deviation) of gene expression levels. It shows how the variance changes with respect to the mean expression. Every dot is a gene and the trend line shows the relationship between the mean and the variance. Note that the variance is relatively stable across expression levels and the relationship is smooth; this is good for analysis and `voom` will use this relationship to adjust the model fits of each gene. If you re-run the code block without the filtering you will see the impact on the mean-variance plot.
+Steps for analysis:
+1. Filter genes, keeping those that have at least 1 log-normalized count in 60% of the samples.
+2. Filter to just the CD4 granuloma and PBMC samples (could alternatively focus on CD8)
+3. Prepare the data as a matrix for computationally efficient testing
+4. Apply Mann-Whitney test across all genes and collect the results
+5. Print the top 20 results with an estimated FDR q-value
+
+```{r}
+# Section 4: Filter genes for analysis
+# ------------------------------------
+ltpm <- ncts %>%
+  column_to_rownames("gene_id") %>%
+  filter(rowMeans(. > 1) > 0.6)
+
+genes <- rownames(ltpm)
+
+# Merge metadata and log-transformed counts
+meta_ss <- meta %>%
+  filter(condition %in% c("CD4_gran", "CD4_PBMC")) %>%
+  column_to_rownames("sampleid")
+
+# Ensure `ltpm` only includes columns for the filtered samples
+ltpm_ss <- ltpm %>%
+  select(all_of(rownames(meta_ss)))
+
+mdf <- meta_ss %>%
+  rownames_to_column("sampleid") %>%
+  bind_cols(t(ltpm_ss))  # Ensure samples (columns of ltpm) match rows of meta
+
+# Section 5: Mann-Whitney U Test for Gene Associations
+# ----------------------------------------------------
+
+# Convert mdf to a matrix for gene expression data
+expression_data <- as.matrix(mdf %>% select(all_of(genes)))
+conditions <- mdf$condition
+
+# Precompute the grouping indices for faster subsetting
+gran_idx <- which(conditions == "CD4_gran")
+pbmc_idx <- which(conditions == "CD4_PBMC")
+
+# Vectorized function to compute statistics for all genes
+collect_res_matrix <- function(expression_data, gran_idx, pbmc_idx, genes) {
+      gran_expr <- expression_data[gran_idx, , drop = FALSE]
+      pbmc_expr <- expression_data[pbmc_idx, , drop = FALSE]
+      
+      # Perform Wilcoxon tests in bulk
+      pvalues <- apply(expression_data, 2, function(gene_expr) {
+        wilcox.test(gene_expr[gran_idx], gene_expr[pbmc_idx])$p.value
+      })
+      
+      # Calculate mean differences
+      mean_gran <- colMeans(gran_expr, na.rm = TRUE)
+      mean_pbmc <- colMeans(pbmc_expr, na.rm = TRUE)
+      mean_diff <- mean_gran - mean_pbmc
+      
+      # Assign "GRAN" or "PBMC" based on the mean difference
+      assoc <- ifelse(mean_diff > 0, "GRAN", "PBMC")
+      
+      # Combine results into a data frame
+      results <- data.frame(
+        gene = genes,
+        pvalue = pvalues,
+        assoc = assoc,
+        stringsAsFactors = FALSE
+      )
+      
+      return(results)
+    }
+
+# Run the matrix-optimized function
+results_df <- collect_res_matrix(expression_data, gran_idx, pbmc_idx, genes)
+
+# Adjust p-values for multiple comparisons
+results_df <- results_df %>%
+  mutate(FDRq = p.adjust(pvalue, method = "fdr")) %>%
+  arrange(pvalue)
+
+# Other genes of interest from the manuscript
+cd4_genes <- c("KLRB1", "CD40LG", "S100A11", "S100A4", "IL26", "BATF")
+cd8_genes <- c("APOBEC3G", "IFNG", "TNF", "CCL1", "CCL20")
+
+gran_genes <- results_df %>%
+  filter(FDRq < 0.1) %>%
+  filter(assoc == 'GRAN') %>%
+  pull(gene)
+
+print(head(results_df, 20))
+```
+
+## Fit the model to identify genes associated with protection (lower CFU)
+
+Now we will test the granuloma-associated genes to see if they are associated with protection.
+
+The `sampleid` columns of the `ncts` variable and the rows of `sampleid` in the `meta` variable match. For this first analysis we will focus on the CD8 T cells sorted from PBMC or granulomas, creating subset tables indicated by `_ss` variable. Then we initialize the `DGEList` object and create a `limma-voom` model with a design matrix to identify genes that are associated with granuloma Mtb burden (CFU).
+
+In the accompanying "mean-variance" plot the x-axis represents the average expression levels of genes across all samples. The y-axis represents the square-root of the variance (i.e., standard deviation) of gene expression levels. It shows how the variance changes with respect to the mean expression. Every dot is a gene and the trend line shows the relationship between the mean and the variance. Note that the variance is relatively stable across expression levels and the relationship is smooth; this is good for analysis and `voom` will use this relationship to adjust the model fits of each gene. If you re-run the code block without the filtering you will see the impact on the mean-variance plot.
 
 ```{r}
 #| fig-width: 5
 #| fig-height: 3
 
-meta_ss = meta %>% filter(condition == "CD8_gran")
+meta_ss = meta %>% filter(condition == "CD4_gran")
 keep_ids = meta_ss %>% pull(sampleid)
 keep_ids = c('gene_id', keep_ids)
 
 ncts_ss = ncts %>% dplyr::select(any_of(keep_ids))
 
-# Discard genes that have low counts/prevalence
-filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))
-ncts_ss = ncts_ss[filter, ]
+# Keep only the genes from 
+ncts_ss <- ncts_ss %>%
+        filter(gene_id %in% gran_genes)
+
+# FOR TESTING ALL GENES: alternatively, discard genes that have low counts/prevalence
+# filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))
+# ncts_ss = ncts_ss[filter, ]
 
 # Create the object for differential expression testing
 dge_o = DGEList(counts=ncts_ss,
                 genes=ncts_ss[, 1],
                 samples=meta_ss,
-                group=meta_ss[['CFU']])
-
-# Compute weights
-# ncts_ss <- calcNormFactors(dge_o, method = "TMM")
+                group=meta_ss[['logCFU']])
 
 # Specify the model/design matrix
-design_temp = model.matrix(~CFU, data=meta_ss)
+design_temp = model.matrix(~logCFU, data=meta_ss)
 
 # Create the voom object and fit the model
-v <- voom(dge_o, design=design_temp, plot=TRUE)
-```
-
-## Fit the model to identify genes associated with protection
-
-```{r}
-# vvwts <- voomWithQualityWeights(dge_o, design=design_temp, normalize.method="none", plot=TRUE)
+v <- voomWithQualityWeights(dge_o, design=design_temp, plot=TRUE)
 fit = lmFit(v, design_temp)
 
 # Estimate contrasts and p-values
@@ -108,7 +206,7 @@ fit = eBayes(fit, robust=TRUE)
 
 summary(decideTests(fit, adjust.method="fdr", p.value = 0.05))
 
-results <- topTable(fit, adjust="BH", coef="CFU", p.value=1, number=Inf, resort.by="P")
+results <- topTable(fit, adjust="BH", coef="logCFU", p.value=1, number=Inf, resort.by="P")
 
 head(results %>% dplyr::select(gene_id, logFC, AveExpr, P.Value, adj.P.Val), 20)
 ```
@@ -156,178 +254,42 @@ volcano_plot
 
 ```{r}
 # Redo the analysis using a mixed-effects model to account for the longitudinal design
-
 dge_o = DGEList(counts=ncts_ss,
                 genes=ncts_ss[, 1],
                 samples=meta_ss,
-                group=meta_ss[['CFU']])
+                group=meta_ss[['logCFU']])
 
 ncts_ss <- calcNormFactors(dge_o, method = "TMM")
 
-design_temp=model.matrix(~CFU, data=meta_ss)
+design_temp=model.matrix(~logCFU, data=meta_ss)
 
-v <- voom(dge_o, design=design_temp, plot=FALSE)
+v <- voomWithQualityWeights(dge_o, design=design_temp, plot=FALSE)
 
-# Can't figure out why I get this error here
-# lme/lmerel model: expression~protect_outcome+sex+visit+(1|animalid)
-# Error in `[.data.frame`(weights.format, order(rownames(weights.format)),  : 
-#                           undefined columns selected
+klm <- kmFit(dat = v,
+             model = "~logCFU + (1|subject)",
+             run_lme = TRUE,
+             libraryID="sampleid",
+             patientID="subject",
+             use_weights = TRUE,
+             metrics = TRUE,
+             run_contrast = FALSE,
+             processors=1)
 
-#klm <- kmFit(dat = v,
-#             model = "~CFU + (1|subject)",
-#             run_lme = TRUE,
-#             libraryID="sampleid",
-#             patientID="subject",
-#             use_weights = TRUE,
-#             metrics = TRUE,
-#             run_contrast = FALSE,
-#             processors=1)
+summarise_kmFit(fdr = klm$lme)
 
-#summarise_kmFit(fdr = klm$lm)
+plot_volcano(model_result = klm,
+             model = "lme", variables = "logCFU",
+             y_cutoff = 0.05)
 
-#plot_volcano(model_result = klm, 
-#             model = "lme", variables = "CFU",
-#             y_cutoff = 0.05)
 ```
 
+
+## Visulize results for a single gene
+
 ```{r}
-# Section 4: Filter genes for analysis
-# ------------------------------------
-ltpm <- ncts %>%
-  column_to_rownames("gene_id") %>%
-  filter(rowMeans(. > 1) > 0.6)
-
-genes <- rownames(ltpm)
-
-# Merge metadata and log-transformed counts
-meta_ss <- meta %>%
-  filter(condition %in% c("CD4_gran", "CD4_PBMC")) %>%
-  column_to_rownames("sampleid")
-
-# Ensure `ltpm` only includes columns for the filtered samples
-ltpm_ss <- ltpm %>%
-  select(all_of(rownames(meta_ss)))
-
-mdf <- meta_ss %>%
-  rownames_to_column("sampleid") %>%
-  bind_cols(t(ltpm_ss))  # Ensure samples (columns of ltpm) match rows of meta
-
-# Section 5: Mann-Whitney U Test for Gene Associations
-# ----------------------------------------------------
-
-collect_res <- function(gene) {
-    gran_expr <- mdf %>%
-      filter(condition == "CD4_gran") %>%
-      pull(gene)
-    pbmc_expr <- mdf %>%
-      filter(condition == "CD4_PBMC") %>%
-      pull(gene)
-    
-    test <- wilcox.test(gran_expr, pbmc_expr)
-    mean_diff <- mean(gran_expr) - mean(pbmc_expr)
-    
-    list(
-      gene = gene,
-      pvalue = test$p.value,
-      stat = test$statistic,
-      assoc = ifelse(mean_diff > 0, "GRAN", "PBMC")
-    )
-    }
-
-results <- lapply(genes, collect_res)
-
-results_df <- bind_rows(results) %>%
-  arrange(pvalue) %>%
-  mutate(FDRq = p.adjust(pvalue, method = "fdr"))
-
-
-# Convert mdf to a matrix for gene expression data
-expression_data <- as.matrix(mdf %>% select(all_of(genes)))
-conditions <- mdf$condition
-
-# Precompute the grouping indices for faster subsetting
-gran_idx <- which(conditions == "CD4_gran")
-pbmc_idx <- which(conditions == "CD4_PBMC")
-
-# Vectorized function to compute statistics for all genes
-collect_res_matrix <- function(expression_data, gran_idx, pbmc_idx, genes) {
-      gran_expr <- expression_data[gran_idx, , drop = FALSE]
-      pbmc_expr <- expression_data[pbmc_idx, , drop = FALSE]
-      
-      # Perform Wilcoxon tests in bulk
-      pvalues <- apply(expression_data, 2, function(gene_expr) {
-        wilcox.test(gene_expr[gran_idx], gene_expr[pbmc_idx])$p.value
-      })
-      
-      # Calculate mean differences
-      mean_gran <- colMeans(gran_expr, na.rm = TRUE)
-      mean_pbmc <- colMeans(pbmc_expr, na.rm = TRUE)
-      mean_diff <- mean_gran - mean_pbmc
-      
-      # Assign "GRAN" or "PBMC" based on the mean difference
-      assoc <- ifelse(mean_diff > 0, "GRAN", "PBMC")
-      
-      # Combine results into a data frame
-      results <- data.frame(
-        gene = genes,
-        pvalue = pvalues,
-        assoc = assoc,
-        stringsAsFactors = FALSE
-      )
-      
-      return(results)
-    }
-
-# Run the matrix-optimized function
-results_df <- collect_res_matrix(expression_data, gran_idx, pbmc_idx, genes)
-
-# Adjust p-values for multiple comparisons
-results_df <- results_df %>%
-  mutate(FDRq = p.adjust(pvalue, method = "fdr")) %>%
-  arrange(pvalue)
-
-print(head(results_df, 20))
-
-# Section 6: Correlation with CFU Using OLS Models
-# ------------------------------------------------
-
-cd4_genes <- c("KLRB1", "CD40LG", "S100A11", "S100A4", "IL26", "BATF")
-cd8_genes <- c("APOBEC3G", "IFNG", "TNF", "CCL1", "CCL20")
-
-sig_genes <- results_df %>%
-  filter(FDRq < 0.1) %>%
-  pull(gene)
-
-cfu_res <- lapply(sig_genes, function(gene) {
-  formula <- as.formula(paste("logCFU ~", gene))
-  model <- lm(formula, data = mdf)
-  summary <- summary(model)
-  
-  conf_int <- confint(model)
-  rho <- cor(mdf$logCFU, mdf[[gene]], method = "spearman")
-  pvalue_corr <- cor.test(mdf$logCFU, mdf[[gene]], method = "spearman")$p.value
-  
-  list(
-    gene = gene,
-    est = summary$coefficients[gene, "Estimate"],
-    est_lb = conf_int[gene, 1],
-    est_ub = conf_int[gene, 2],
-    pvalue = summary$coefficients[gene, "Pr(>|t|)"],
-    rho = rho,
-    corr_pvalue = pvalue_corr
-  )
-})
-
-cfu_res_df <- bind_rows(cfu_res) %>%
-  arrange(pvalue) %>%
-  mutate(FDRq = p.adjust(pvalue, method = "fdr"))
-
-print(head(cfu_res_df, 20))
-
-# Section 8: Visualization
-# ------------------------
-# Scatterplot of Gene Expression vs. CFU
+# Scatterplot of Gene Expression vs. log-CFU
 gene <- "TNFRSF4"
+
 ggplot(mdf, aes_string(x = "logCFU", y = gene)) +
   geom_point() +
   geom_smooth(method = "lm", formula = y ~ x) +
@@ -349,6 +311,9 @@ ggplot(mdf, aes_string(x = "condition", y = gene)) +
   ) +
   theme_minimal()
 ```
+## Use the Bromley et al. data to identify cells that express protective genes and validate their association with protection
+
+We can use the Bromley
 
 ```{r}
 # Load Bromley data
@@ -417,7 +382,9 @@ res_df <- do.call(rbind, res) %>%
   mutate(FDRq = p.adjust(pvalue, method = "fdr"))
 
 print(res_df)
+```
 
+```{r}
 # Extract the top gene and cluster
 top_gene <- res_df$gene[1]
 top_cluster <- res_df$cluster[1]
@@ -439,8 +406,9 @@ ggplot(ss, aes(x = cpm, y = CoarseClustering, color = Group)) +
     y = "Coarse Clustering"
   ) +
   theme_minimal()
+```
 
-
+```{r}
 # Visualization: Scatterplot of cpm vs logCFU for the top cluster
 ss_top <- ss %>% filter(CoarseClustering == top_cluster)
 
