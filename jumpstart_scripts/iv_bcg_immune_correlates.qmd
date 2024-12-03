@@ -6,7 +6,7 @@ editor: source
 
 ## Data
 
-This 2024 TB hackday script uses data from two related studies:
+This 2024 TB Hackday script uses data from two related studies:
 
 1.  [Darrah et al. 2023](https://pubmed.ncbi.nlm.nih.gov/37267955/) (Cell Host Microbe) **Airway T cells are a correlate of i.v. Bacille Calmette-Guerin-mediated protection against tuberculosis in rhesus macaques**
 2.  [Liu et al. 2023](https://pmc.ncbi.nlm.nih.gov/articles/PMC10394165/) (*Cell Reports)* **Blood transcriptional correlates of BCG-induced protection against tuberculosis in rhesus macaques**
@@ -78,7 +78,7 @@ As a first exploration, consider Figure 1D from Liu et al. 2023. It show the num
 
 The immune correlates data `correlates_tbl` has a `<key>` column and `<short_key>` column.
 
-IMPORTANT NOTE: the `<key>` column includes timepoint or "nAUC", whereas the short_key column does not. If you filter by `<short_key>` column you will return data from all time points, which is what we want for figure 1!!!
+IMPORTANT NOTE: the `<key>` column includes time point or "nAUC", whereas the short_key column does not. If you filter by `<short_key>` column you will return data from all time points, which is what we want for figure 1!!!
 
 The variables names are terse. For the `<short_key>`, the authors use abbreviations for cytokines in : G (IFNg) , T (TNF) , 2 (IL-2), 17 (IL-17). They use "Any" to indicate positivity for cytokine. For BAL (lung), the relevant short key names for CD4 and CD8 T cells producing any of the 4 cytokines is: `(L)#CD4:AnyG2T17` and `(L)#CD8:AnyG2T17` , respectively.
 
@@ -100,7 +100,7 @@ response_by_dose_plot <- function(var1 = "(L)#CD4:AnyG2T17") {
     group_by(binned_bcg_dose, animalid, protect_outcome) %>%
     tally() %>% 
     left_join(selected_var1) 
-  # We compute the median at each timepoint for each binned group
+  # We compute the median at each time point for each binned group
   # to show central trend similar to Fig 1D.
   data_median1 = data1 %>% 
     group_by(binned_bcg_dose, tp) %>% 
@@ -171,7 +171,7 @@ correlates_tbl %>%
   
 ```
 
-Notice that a (+) or (-) indicates the presence and absences of cytokines in that number of cells with that speciifc combination. There are only 10 combination IFNg + CD4+ boolean combinations. Later on you may wish to examine two interesting ones — `(L)%CD4:G+2+17-T-")` vs. `(L)#CD4:G+2-17-T+` . these are similar in their degree of poly functionality but differ in co-expression: `IFNg+IL2+IL17-TNF-` vs `IFNg+IL2-IL17-TNF+` .[Darrah et al. 2023](https://pubmed.ncbi.nlm.nih.gov/37267955/) emphasized that the frequency of CD4 T cells producing TNF with interferon γ (IFNγ) was one of key signatures of protection.
+Notice that a (+) or (-) indicates the presence and absences of cytokines in that number of cells with that specific combination. There are only 10 combination IFNg + CD4+ Boolean combinations. Later on you may wish to examine two interesting ones — `(L)%CD4:G+2+17-T-")` vs. `(L)#CD4:G+2-17-T+` . these are similar in their degree of poly functionality but differ in co-expression: `IFNg+IL2+IL17-TNF-` vs `IFNg+IL2-IL17-TNF+` .[Darrah et al. 2023](https://pubmed.ncbi.nlm.nih.gov/37267955/) emphasized that the frequency of CD4 T cells producing TNF with interferon γ (IFNγ) was one of key signatures of protection.
 
 ### Try this: reuse the code with different variables
 
@@ -194,7 +194,7 @@ gridExtra::grid.arrange(gg1, gg2, gg3, gg4, ncol =1)
 
 Next, let's extend the code to examine which animal were protected by coloring each line by the animal protection status after TB challenge. (NOTE: Recall the time series was collected after i.v. administration of the BCG vaccine before the challenge).
 
-Run the code. What do you notices about the intermediate dose group? Do those withj more robust T cell responses to BCG (i.e., more cytokine producing cells) tend to be protected from subsequent challenge. (In case you are curious – the T cell response is measured *ex vivo* via an intercellular cytokine staining assays where PBMCs were stimulated using a tuberculin protein [PPD skin test antigen](https://www.ncbi.nlm.nih.gov/books/NBK556037/)).
+Run the code. What do you notices about the intermediate dose group? Do those with more robust T cell responses to BCG (i.e., more cytokine producing cells) tend to be protected from subsequent challenge. (In case you are curious – the T cell response is measured *ex vivo* via an intercellular cytokine staining assays where PBMCs were stimulated using a tuberculin protein [PPD skin test antigen](https://www.ncbi.nlm.nih.gov/books/NBK556037/)).
 
 ```{r}
 #| warning: false
@@ -212,7 +212,7 @@ response_by_dose_protection_plot<- function(var1 = "(L)#CD4:AnyG2T17") {
     group_by(binned_bcg_dose, animalid, protect_outcome) %>%
     tally() %>% 
     left_join(selected_var1) 
-  # We compute the median at each timepoint for each binned group
+  # We compute the median at each time point for each binned group
   # to show central trend similar to Fig 1D.
   # Use ggplot to construct the plot
   gg = ggplot(data = data1, 
@@ -245,7 +245,7 @@ Perhaps you wish to examine every variable at once. Below are functions for perf
 
 ```{r}
 #| warning: false
-# Function returns p-value from Wilcoxon unpaired test - the liklihood that that rank difference between groups might arise by chance.
+# Function returns p-value from Wilcoxon unpaired test - the likelihood that that rank difference between groups might arise by chance.
 test_function <- function(df){
   if (any(is.na(df$value))){
     return(NA)
@@ -334,11 +334,11 @@ diffs_tbl %>%
 ### Sort the results to find the variables that distinguish the protected and non-protected groups.
 
 
-Try sorting diffs_tbl to find parameters that differ between teh protected and non protected groups.
+Try sorting diffs_tbl to find parameters that differ between the protected and non protected groups.
 
 You may wish to :
 
-* `filter(tp = 0)` to filter to the pre-BCG timepoint
+* `filter(tp = 0)` to filter to the pre-BCG time point
 * `arrange(wilcox_p)` to sort by p-value
 * `arrange(mean_ratio)` to sort by mean_ratio
 
@@ -361,7 +361,7 @@ diffs_tbl %>% filter(key == var_name ) %>%
 ## Try this: Examine variable and protection status longitudinally
 
 You can also use the  `response_by_dose_protection_plot((var1 = "YOUR_VARIABLE")` 
-function we used above to examine values of an immune variable logitudinally.
+function we used above to examine values of an immune variable longitudinally.
 
 
 # Suggestions
@@ -381,7 +381,7 @@ In other modules you will be able to consider which gene expression modules migh
 
 ## Joining Data by Subject
 
-Suppose you want to evaluate gene expression with a specific immune variable. Suppose you select `Bool/CD4/FoP/g+2-17-T+ 8` This is from the BAL and Boolean combination of CD4 T cells that are IFNg+ IL2- IL17- and TNF+ at timepoint 8.
+Suppose you want to evaluate gene expression with a specific immune variable. Suppose you select `Bool/CD4/FoP/g+2-17-T+ 8` This is from the BAL and Boolean combination of CD4 T cells that are IFNg+ IL2- IL17- and TNF+ at time point 8.
 
 ```{r}
 var1 = 'Bool/CD4/FoP/g+2-17-T+ 8'
@@ -390,7 +390,7 @@ selected_var1 =   correlates_tbl %>%
   filter(key == var1) %>% 
   select(animalid, key, short_key, value)
 
-# join hte metadata with the immunlogical variable by animalid
+# join the metadata with the immunological variable by animalid
 # create a sampleid that matched the gex_tbl sample names
 data1 = rmeta_tbl %>%
   left_join(selected_var1, by= "animalid" )  %>% 

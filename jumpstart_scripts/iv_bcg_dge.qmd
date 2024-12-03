@@ -8,7 +8,7 @@ editor:
 
 ## Data
 
-This TB hackday script uses (pre-processed) RNA sequencing data from the following study:
+This TB Hackday script uses (pre-processed) RNA sequencing data from the following study:
 
 1.  [Liu et al. 2023](https://pubmed.ncbi.nlm.nih.gov/37390827/) (*Cell Rep Med*) **Blood transcriptional correlates of BCG-induced protection against tuberculosis in rhesus macaques**
 
@@ -26,7 +26,7 @@ In the earlier "route" study Darrah et al. (2020) immunized NHP with BCG by vary
 
 ## Hypotheses for hacking
 
- - The original manuscript first identified genes that were differentially upregulated after BCG and then looked for association with protection. Can we directly identify genes that are associated with protection? Does the model need adjustment for covariates? e.g., sex, route, dose
+ - The original manuscript first identified genes that were differentially up-regulated after BCG and then looked for association with protection. Can we directly identify genes that are associated with protection? Does the model need adjustment for covariates? e.g., sex, route, dose
  - Can we use clustering/WGCNA to identify gene modules or GSEA to identify pre-existing gene modules associated with protection?
  - How well do the genes classify protected and non-protected animals using CV-AUC?
  - Does baseline expression of the BCG-responsive genes associate with protection? 
@@ -63,7 +63,7 @@ meta <- readr::read_csv(file.path(data_dir, "liu_etal_metadata.csv"))
 
 The `sampleid` columns of the `ncts` variable and the rows of `sampleid` in the `meta` variable match. For this first analysis we will focus on the NHP that received high-dose IV BCG and the blood from 2 weeks after immunization, creating subset tables indicated by `_ss` variables. Then we initialize the `DGEList` object and create a `limma` `voom` model with a design matrix to identify genes that are associated with protection.
 
-In the accompanying "mean-variace" plot the x-axis represents the average expression levels of genes across all samples. The y-axis represents the square-root of the variance (i.e., standard deviation) of gene expression levels. It shows how the variance changes with respect to the mean expression. Every dot is a gene and the trend line shows the relationship between the mean and the variance. Note that the variance is relatively stable across expression levels and the relationship is smooth; this is good for analysis and `voom` will use this relationship to adjust the model fits of each gene. If you re-run the code block without the filtering you will see the impact on the mean-variance plot.
+In the accompanying "mean-variance" plot the x-axis represents the average expression levels of genes across all samples. The y-axis represents the square-root of the variance (i.e., standard deviation) of gene expression levels. It shows how the variance changes with respect to the mean expression. Every dot is a gene and the trend line shows the relationship between the mean and the variance. Note that the variance is relatively stable across expression levels and the relationship is smooth; this is good for analysis and `voom` will use this relationship to adjust the model fits of each gene. If you re-run the code block without the filtering you will see the impact on the mean-variance plot.
 
 Notice also that we specify a design matrix which includes covariates `sexM` (male = 1) 
 
@@ -122,7 +122,7 @@ head(results %>% dplyr::select(gene, logFC, AveExpr, P.Value, adj.P.Val), 20)
 ## Create a volcano plot for single-gene association with protection
 
 
-A volcano plot shows log fold-change on the x-axis and negative log10-tranformed p-value on hte y-axis. Each dot repressents a gene. 
+A volcano plot shows log fold-change on the x-axis and negative log10-transformed p-value on the y-axis. Each dot represents a gene. 
 In this case fold change is based on grouping variable of `protection_outcome` protected and un-protected, with points the 
 right enriched in animals with protected status, after adjusting for the sex variable.
 
@@ -164,7 +164,7 @@ volcano_plot
 
 ## See if there are any genes significantly associated with sex of the animals
 
-See if you can modify the code above to test for differentially expresseed genes in the male animals. Change the 
+See if you can modify the code above to test for differentially expressed genes in the male animals. Change the 
 `design_temp` model.matrix and `coef` argument in `topTable` function. See below.
 
 ```{r}
