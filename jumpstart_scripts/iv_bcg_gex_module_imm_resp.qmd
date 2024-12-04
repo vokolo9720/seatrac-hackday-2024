@@ -8,7 +8,7 @@ editor:
 
 ## Data
 
-This TB hackday script uses (pre-processed) RNA sequencing data from Liu et al. and immune response data from Darrah et al. for NHP that were immunized using IV BCG:
+This TB Hackday script uses (pre-processed) RNA sequencing data from Liu et al. and immune response data from Darrah et al. for NHP that were immunized using IV BCG:
 
 1.  [Liu et al. 2023](https://pubmed.ncbi.nlm.nih.gov/37390827/) (*Cell Rep Med*) **Blood transcriptional correlates of BCG-induced protection against tuberculosis in rhesus macaques**
 
@@ -23,7 +23,7 @@ With these studies, 34 NHPs were immunized with various doses of intravenous (i.
 
 ![Liu et al. 2023 Cell Reports Time Points](assets/liu_et_al_timeline.png)
 
-Darrah et al. found that several immune responses measured from BAL/lung including CD4 T cells, NK cells, and PPD-specific IgA. Many of the responses covary, making it difficult to discern which response correlates most strongly. Liu et al. found that gene expression of specific modules *after* IV BCG were correlated with both the adaptive immune responses, as well as protection.
+Darrah et al. found that several immune responses measured from BAL/lung including CD4 T cells, NK cells, and PPD-specific IgA. Many of the responses co-vary, making it difficult to discern which response correlates most strongly. Liu et al. found that gene expression of specific modules *after* IV BCG were correlated with both the adaptive immune responses, as well as protection.
 
 ![Darrah et al. 2023, Figure 6](assets/darrah_2023_fig6.jpg)
 
@@ -37,7 +37,7 @@ Darrah et al. found that several immune responses measured from BAL/lung includi
 
 Load relevant packages. Change `<data_dir>` variable as appropriate.
 
-Load the imune response data, the pre-processed RNA sequencing data and the NHP meta-data. There are three important files:
+Load the immune response data, the pre-processed RNA sequencing data and the NHP meta-data. There are three important files:
 
 1.  `liu_et_al_counts.csv` contains log-transformed/normalized counts that were computed from raw counts by the study authors using DESEQ2 variance stabilizing transform (`vst`). This should be appropriately distributed for limma as well. The table contains 312 columns, with one column `gene` and the remaining columns matching `sampleid`s in the metadata. There are 22,496 genes in the dataset.
 

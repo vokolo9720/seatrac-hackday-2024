@@ -8,7 +8,7 @@ editor:
 
 ## Data
 
-This TB hackday script uses (pre-processed) RNA sequencing data from the following study to identify granuloma-associated T cell genes:
+This TB Hackday script uses (pre-processed) RNA sequencing data from the following study to identify granuloma-associated T cell genes:
 
 1.  [Foreman et al. 2023](https://pubmed.ncbi.nlm.nih.gov/37097292/) (*J Exp Med*) **CD30 co-stimulation drives differentiation of protective T cells during Mycobacterium tuberculosis infection**
 
@@ -22,7 +22,7 @@ Foreman et al. compared the gene expression of T cells isolated from PBMC vs. T 
 
 ![Foreman et al. 2023 Granuloma-associated T cell genes](assets/foreman_jem_fig2.png)
 
-Bromley et al. report on an experiment with three groups of cynomolgus macaques: (1) anti-CD4 treated, Mtb-exposed (n=7), (2) IgG control, Mtb-exposed (n=6), (3) No treatment, Mtb-naive (n=6). Groups (2) and (3) were infected with Mtb, then given an anti-CD4 antibody to deplete CD4+ T cells or an isotype control (IgG) antibody, and finally challenged with a secondary Mtb infection. Group 3 only received a primary Mtb infection. Granulomas were then analyzed using single-cell RNAseq, with 3 NHP from (1) and 2 NHP from (2) and (3) each. We have created pseudo-bulk datasets using two different clusterings of the cells, offering two levels of cell type granularity for analysis: `bromley_X_pseudobulk_counts.csv` where `X` is `coarse` or `subclustering`, with clusters defined by the authors of the manuscript. By analyzing data from primary infection, reinfection, and reinfection-CD4+ T cell-depleted granulomas, they found that the presence of CD4+ T cells during reinfection resulted in a less inflammatory lung milieu characterized by reprogrammed CD8+ T cells, reduced neutrophilia, and blunted type 1 immune signaling among myeloid cells.
+Bromley et al. report on an experiment with three groups of cynomolgus macaques: (1) anti-CD4 treated, Mtb-exposed (n=7), (2) IgG control, Mtb-exposed (n=6), (3) No treatment, Mtb-naive (n=6). Groups (2) and (3) were infected with Mtb, then given an anti-CD4 antibody to deplete CD4+ T cells or an isotype control (IgG) antibody, and finally challenged with a secondary Mtb infection. Group 3 only received a primary Mtb infection. Granulomas were then analyzed using single-cell RNAseq, with 3 NHP from (1) and 2 NHP from (2) and (3) each. We have created pseudo-bulk datasets using two different clustering of the cells, offering two levels of cell type granularity for analysis: `bromley_X_pseudobulk_counts.csv` where `X` is `coarse` or `subclustering`, with clusters defined by the authors of the manuscript. By analyzing data from primary infection, reinfection, and reinfection-CD4+ T cell-depleted granulomas, they found that the presence of CD4+ T cells during reinfection resulted in a less inflammatory lung milieu characterized by reprogrammed CD8+ T cells, reduced neutrophilia, and blunted type 1 immune signaling among myeloid cells.
 
 ![Bromley et al. 2024 CD4+ T cells re-wire granuloma cellularity and regulatory networks to promote immunomodulation following Mtb reinfection](assets/bromley_etal_fig1.jpg)
 
@@ -41,7 +41,7 @@ Load the pre-processed RNA sequencing data. There are several important files:
 
 2.  `foreman_etal_meta.csv` contains all the 83 sample- and granuloma-level metadata that is available for these samples and animals. There are 27 CD8+ T cell samples sorted from granulomas and 31 CD4+ T cell samples sorted from granulomas. Other variables include `subject`, `sort`, `condition`, `sex`, and granuloma `CFU`.
 
-3. `bromley_coarse_pseudobulk_counts.csv` is a long-form table containing counts for 33 granulomas from 7 NHP, with over 25K genes from 15 coarse clusters of cells from the granulomas (44 sub-clusters). There are columns for `biosample_id`, `CoarseClustering`, `counts` and `gene`. Counts are not log-normalized. Psuedo-bulk counts were created by summing the counts across all cells in a cluster for each sample.
+3. `bromley_coarse_pseudobulk_counts.csv` is a long-form table containing counts for 33 granulomas from 7 NHP, with over 25K genes from 15 coarse clusters of cells from the granulomas (44 sub-clusters). There are columns for `biosample_id`, `CoarseClustering`, `counts` and `gene`. Counts are not log-normalized. Pseudo-bulk counts were created by summing the counts across all cells in a cluster for each sample.
 
 4. `bromley_coarse_pseudobulk_counts.meta.csv` contains meta-data that can be joined to the counts data on `biosample_id`. Variables include `donor_id`, `Group`, `CFU` (for the granuloma), and `CoarseClustering`/`SubclusteringV2`. 
 
@@ -109,7 +109,7 @@ mdf <- meta_ss %>%
 expression_data <- as.matrix(mdf %>% select(all_of(genes)))
 conditions <- mdf$condition
 
-# Precompute the grouping indices for faster subsetting
+# Precompute the grouping indices for faster sub-setting
 gran_idx <- which(conditions == "CD4_gran")
 pbmc_idx <- which(conditions == "CD4_PBMC")
 
@@ -287,7 +287,7 @@ plot_volcano(model_result = klm,
 ## Visulize results for a single gene
 
 ```{r}
-# Scatterplot of Gene Expression vs. log-CFU
+# Scatter-plot of Gene Expression vs. log-CFU
 gene <- "TNFRSF4"
 
 ggplot(mdf, aes_string(x = "logCFU", y = gene)) +
