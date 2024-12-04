@@ -30,7 +30,7 @@ Darrah et al. found that several immune responses measured from BAL/lung includi
 ## Hypotheses for hacking
 
  - Are there specific pairs of immune responses or gene module scores that are significantly better at predicting the challenge outcome? Use CV-AUC to evaluate models. What model works best for combining features for prediction of outcome?
- - While the original study focused on post-BCG gene expression as correlates of immune response and protection, it may be interesting to see how baseline gene expression is associated with immune responses or protection.
+ - While the original study focused on post-BCG gene expression as correlates of immune response and protection, it may be interesting to see how *baseline* gene expression is associated with immune responses or protection.
  - If you use alternative outcomes, for example number of granulomas or total CFU, are there different modules or immune responses that are better associated with outcome? Are there any features that are associated consistently with all outcomes?
 
 ## Setup R and load the data.
@@ -39,7 +39,7 @@ Load relevant packages. Change `<data_dir>` variable as appropriate.
 
 Load the immune response data, the pre-processed RNA sequencing data and the NHP meta-data. There are three important files:
 
-1.  `liu_et_al_counts.csv` contains log-transformed/normalized counts that were computed from raw counts by the study authors using DESEQ2 variance stabilizing transform (`vst`). This should be appropriately distributed for limma as well. The table contains 312 columns, with one column `gene` and the remaining columns matching `sampleid`s in the metadata. There are 22,496 genes in the dataset.
+1.  `liu_et_al_counts.csv` contains log-transformed/normalized counts that were computed from raw counts by the study authors using DESEQ2 variance stabilizing transform (`vst`). We'll use rank-based correlation so the data transform does not impact the analysis. The table contains 312 columns, with one column `gene` and the remaining columns matching `sampleid`s in the metadata. There are 22,496 genes in the dataset.
 
 2.  `liu_etal_meta.csv` contains all the 29 sample-level metadata that is available for these samples and animals including `sampleid`, `studyid`, `animalid`, `visit`, `route`, `dose_group`, `log_mtb_cfu`, and `protect_outcome`.
 
@@ -56,6 +56,7 @@ library(multcomp) # For FDR adjustment
 # NOTE --- REPLACE the <data_dir> FOLDER DESTINTATION AS APPROPRIATE
 # Define the project folder and file paths
 data_dir <- file.path("/fh/fast/gilbert_p/fg_data", "SEATRAC", "TB_hackday_2024", "processed_data")
+# data_dir <- file.path("/home/processed_data", "SEATRAC", "TB_hackday_2024", "processed_data")
 
 meta_fn <- file.path(data_dir, "liu_etal_metadata.csv")
 module_fn <- file.path(data_dir, "liu_etal_modules.csv")
@@ -72,7 +73,9 @@ imm <- readr::read_csv(immune_fn) %>%
   rename(animalid = subjid)
 
 ```
+## Compute module scores and visualize BCG response
 
+Gene modules were generated de-novo by Liu et al. using WGCNA on the genes that were differentially expressed after BCG. They detected DEGs at each time point and combined them for the WGCNA analysis. We can then compute a score for each module within each sample by averaging the expression of genes in the module.
 
 ```{r}
 
@@ -98,6 +101,9 @@ ggplot(mod_scores, aes(x = module, y = count, fill = visit)) +
   theme_minimal()
 
 ```
+## Estimate correlation of module scores with other immune responses
+
+As an example we will focus on the M1 module which is up-regulated 2 days post-BCG. We then filter the gene expression data to just M1@d2 and join with the immune response data, careful to join on the `animalid`. Correlation is assessed using rank-based Spearman correlation. The joining and correlating is repeated for each immune response variable by doing a `group_map` over the `key` variable. Finally, results are aggregated and an adjustment for multiple hypothesis testing is applied.
 
 ```{r}
 #| warning: false
@@ -152,6 +158,12 @@ results %>%
   slice_head(n = 20)
 
 ```
+
+## Visualize a top result
+
+Here we can visualize one of the top correlations using a scatter plot. This correlation of M1 gene expression at day 2 with CD4+ T cell responses in the blood was reported in the manuscript. From here one could consider how pairs of modules are able to predict the adaptive immune responses, or find an optimal predictor using machine learning.
+
+It is also interesting to consider how pre-BCG gene expression predicts the adaptive response, with specific focus on the innate/inflammatory gene modules that are about to be induced by BCG.
 
 ```{r}
 # Example correlation scatter plot
