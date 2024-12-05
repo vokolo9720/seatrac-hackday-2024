@@ -46,13 +46,12 @@ Load the pre-processed RNA sequencing data. There are two important files:
 
 ```{r}
 #| warning: false
-library(readr)
 library(tidyverse)
 library(edgeR)
+library(limma)
 library(kimma)
-library(ggplot2)
-library(dplyr)
 library(ggrepel)
+library(BIGpicture)
 
 # NOTE --- REPLACE the <data_dir> FOLDER DESTINTATION AS APPROPRIATE
 data_dir <- '/fh/fast/gilbert_p/fg_data/SEATRAC/TB_hackday_2024/processed_data'

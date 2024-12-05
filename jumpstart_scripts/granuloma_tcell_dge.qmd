@@ -50,15 +50,18 @@ Load the pre-processed RNA sequencing data. There are several important files:
 
 ```{r}
 #| warning: false
-library(dplyr)       # For data manipulation
-library(ggplot2)     # For data visualization
-library(readr)       # For reading CSV/TSV files
-library(tidyr)       # For reshaping data
+library(tidyverse)   # For data manipulation and plotting
 library(stats)       # For basic statistical tests
 library(multcomp)    # For multiple comparison corrections
 library(lme4)        # For mixed-effects modeling
 library(broom)       # For tidying model outputs
 library(data.table)  # Efficient data handling
+library(edgeR)       # RNAseq data processing
+library(limma)       # RNAseq linear models
+library(ggrepel)     # Label points in scatterplot
+library(kimma)       # RNAseq linear mixed effects models
+library(BIGpicture)  # RNAseq plots
+select <- dplyr::select
 
 # NOTE --- REPLACE the <data_dir> FOLDER DESTINTATION AS APPROPRIATE
 
