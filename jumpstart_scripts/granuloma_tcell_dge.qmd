@@ -214,11 +214,11 @@ fit = lmFit(v, design_temp)
 # Estimate contrasts and p-values
 fit = eBayes(fit, robust=TRUE)
 
-summary(decideTests(fit, adjust.method="fdr", p.value = 0.05))
+summary(decideTests(fit, adjust.method="fdr", p.value = 0.2))
 
 results <- topTable(fit, adjust="BH", coef="logCFU", p.value=1, number=Inf, resort.by="P")
 
-head(results %>% dplyr::select(gene_id, logFC, AveExpr, P.Value, adj.P.Val), 20)
+head(results %>% dplyr::select(genes, logFC, AveExpr, P.Value, adj.P.Val), 20)
 ```
 
 ## Create a volcano plot for single-gene association with protection
@@ -243,7 +243,7 @@ volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
   geom_point(aes(color = Significance), alpha = 0.6) +
   scale_color_manual(values = c("Significant" = "red", "Not Significant" = "grey")) +
   geom_text_repel(data = top_genes,
-                  aes(label = gene_id),
+                  aes(label = genes),
                   max.overlaps = 10,
                   box.padding = 0.3,
                   point.padding = 0.3,
@@ -252,9 +252,9 @@ volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
   xlim(c(-max_logFC, max_logFC)) +
   theme_minimal() +
   labs(
-    x = "log2 Fold-change",
+    x = "log2 Estimate",
     y = "-log10 P-value",
-    color = "FDR < 0.05") +
+    color = "FDR < 0.2") +
   theme(plot.title = element_text(hjust = 0.5))
 
 volcano_plot
