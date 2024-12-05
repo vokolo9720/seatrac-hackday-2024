@@ -93,7 +93,7 @@ ltpm <- ncts %>%
   column_to_rownames("gene_id") %>%
   filter(rowMeans(. > 1) > 0.6)
 
-genes <- rownames(ltpm)
+genes_filter <- rownames(ltpm)
 
 # Merge metadata and log-transformed counts
 meta_ss <- meta %>%
@@ -112,7 +112,7 @@ mdf <- meta_ss %>%
 # ----------------------------------------------------
 
 # Convert mdf to a matrix for gene expression data
-expression_data <- as.matrix(mdf %>% select(all_of(genes)))
+expression_data <- as.matrix(mdf %>% select(all_of(genes_filter)))
 conditions <- mdf$condition
 
 # Precompute the grouping indices for faster sub-setting
@@ -149,7 +149,7 @@ collect_res_matrix <- function(expression_data, gran_idx, pbmc_idx, genes) {
     }
 
 # Run the matrix-optimized function
-results_df <- collect_res_matrix(expression_data, gran_idx, pbmc_idx, genes)
+results_df <- collect_res_matrix(expression_data, gran_idx, pbmc_idx, genes_filter)
 
 # Adjust p-values for multiple comparisons
 results_df <- results_df %>%
