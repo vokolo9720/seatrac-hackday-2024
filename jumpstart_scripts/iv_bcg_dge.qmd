@@ -278,3 +278,18 @@ plot_volcano(model_result = klm,
              model = "lme", variables = "protect_outcome",
              y_cutoff = 0.2, label = 10)
 ```
+If you want to delve deeper into the pairwise comparisons within the interaction term (e.g. what is the effect time in each protection outcome?), try running kimma contrasts and exploring the output `klm$lme.contrast`. This will take several minutes to run.
+
+```{r eval=FALSE}
+klm <- kmFit(
+  dat = v,
+  model = "~protect_outcome*visit + sex + (1|animalid)", #Include interaction
+  run_lme = TRUE, 
+  run_contrast = TRUE, contrast_var="protect_outcome:visit", #Run contrasts
+  libraryID="sampleid",
+  patientID="animalid",
+  use_weights = TRUE,
+  metrics = FALSE,
+  processors=6)
+```
+
