@@ -260,20 +260,12 @@ volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
 volcano_plot
 ```
 
-## Redo the analysis using a mixed-effects model to incorporate data from additional visits and account for the longitudinal design
+## Redo the analysis using a mixed-effects model to incorporate repeated measures
+
+Using kimma, perform the same analysis for CFU only now taking into account the within animal variability with multiple granulomas samples from the same animal. We will still focus on CD4+ cells from granulomas.
 
 ```{r}
-# Redo the analysis using a mixed-effects model to account for the longitudinal design
-dge_o = DGEList(counts=ncts_ss,
-                genes=ncts_ss[, 1],
-                samples=meta_ss,
-                group=meta_ss[['logCFU']])
-
-ncts_ss <- calcNormFactors(dge_o, method = "TMM")
-
-design_temp=model.matrix(~logCFU, data=meta_ss)
-
-v <- voomWithQualityWeights(dge_o, design=design_temp, plot=FALSE)
+# Use the same voom object as with limma
 
 klm <- kmFit(dat = v,
              model = "~logCFU + (1|subject)",
@@ -281,15 +273,14 @@ klm <- kmFit(dat = v,
              libraryID="sampleid",
              patientID="subject",
              use_weights = TRUE,
-             metrics = TRUE,
-             run_contrast = FALSE,
+             metrics = FALSE,
              processors=1)
 
 summarise_kmFit(fdr = klm$lme)
 
 plot_volcano(model_result = klm,
              model = "lme", variables = "logCFU",
-             y_cutoff = 0.05)
+             y_cutoff = 0.2, label = 10)
 
 ```
 
