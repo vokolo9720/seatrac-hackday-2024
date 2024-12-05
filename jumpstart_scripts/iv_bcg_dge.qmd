@@ -122,7 +122,7 @@ fit = lmFit(v, design_temp)
 # Estimate contrasts and p-values
 fit = eBayes(fit, robust=TRUE)
 
-summary(decideTests(fit, adjust.method="fdr", p.value = 0.05))
+summary(decideTests(fit, adjust.method="fdr", p.value = 0.2))
 
 results <- topTable(fit, adjust="BH", coef="protect_outcomeprotected", p.value=1, number=Inf, resort.by="P")
 
@@ -152,12 +152,12 @@ top_genes <- results %>%
 max_logFC <- max(abs(results$logFC), na.rm = TRUE)
 
 # Create the volcano plot
-volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
+volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(adj.P.Val))) +
   geom_point(aes(color = Significance), alpha = 0.6) +
   scale_color_manual(values = c("Significant" = "red", "Not Significant" = "grey")) +
   geom_text_repel(data = top_genes,
-                  aes(label = gene),
-                  max.overlaps = 10,
+                  aes(label = genes),
+                  max.overlaps = Inf,
                   box.padding = 0.3,
                   point.padding = 0.3,
                   segment.color = "grey50",
@@ -166,8 +166,8 @@ volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
   theme_minimal() +
   labs(
        x = "log2 Fold-change (protection status)",
-       y = "-log10 P-value",
-       color = "FDR < 0.05") +
+       y = "-log10 FDR",
+       color = "FDR < 0.2") +
   theme(plot.title = element_text(hjust = 0.5))
 volcano_plot
 ```
@@ -219,26 +219,26 @@ summary(decideTests(fit, adjust.method="fdr", p.value = 0.05))
 
 results <- topTable(fit, adjust="BH", coef="sexM", p.value=1, number=Inf, resort.by="P")
 
-head(results %>% dplyr::select(gene, logFC, AveExpr, P.Value, adj.P.Val), 20)
+head(results %>% dplyr::select(genes, logFC, AveExpr, P.Value, adj.P.Val), 20)
 
 # Add a column for significance based on FDR
 results <- results %>%
-  mutate(Significance = ifelse(adj.P.Val < 0.05, "Significant", "Not Significant"))
+  mutate(Significance = ifelse(adj.P.Val < 0.2, "Significant", "Not Significant"))
 
 # Select the top 10 genes based on adjusted p-value for labeling
 top_genes <- results %>%
   arrange(adj.P.Val) %>%
-  slice_head(n = 30)
+  slice_head(n = 10)
 
 max_logFC <- max(abs(results$logFC), na.rm = TRUE)
 
 # Create the volcano plot
-volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
+volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(adj.P.Val))) +
   geom_point(aes(color = Significance), alpha = 0.6) +
   scale_color_manual(values = c("Significant" = "red", "Not Significant" = "grey")) +
   geom_text_repel(data = top_genes,
-                  aes(label = gene),
-                  max.overlaps = 10,
+                  aes(label = genes),
+                  max.overlaps = Inf,
                   box.padding = 0.3,
                   point.padding = 0.3,
                   segment.color = "grey50",
@@ -247,8 +247,8 @@ volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
   theme_minimal() +
   labs(
        x = "log2 Fold-change (sexM)",
-       y = "-log10 P-value",
-       color = "FDR < 0.05") +
+       y = "-log10 FDR",
+       color = "FDR < 0.2") +
   theme(plot.title = element_text(hjust = 0.5))
 volcano_plot
 ```
@@ -295,6 +295,6 @@ klm <- kmFit(dat = v,
 summarise_kmFit(fdr = klm$lm)
 
 plot_volcano(model_result = klm, 
-             model = "lm", variables = "protect_outcomeprotected",
-             y_cutoff = 0.05)
+             model = "lme", variables = "protect_outcome",
+             y_cutoff = 0.2, label = 10)
 ```
