@@ -40,7 +40,7 @@ Load relevant packages. Change `<data_dir>` variable as appropriate.
 
 Load the pre-processed RNA sequencing data. There are two important files:
 
-1.  `liu_et_al_counts.csv` contains log-transformed/normalized counts that were computed from raw counts by the study authors using DESEQ2 variance stabilizing transform (`vst`). We will need to reverse the log-transfor to use `voom` for differential expression analysis. The table contains 312 columns, with one column `gene` and the remaining columns matching `sampleid`s in the metadata. There are 22,496 genes in the dataset.
+1.  `liu_et_al_counts.csv` contains normalized counts that were computed from raw counts by the study authors using DESEQ2 variance stabilizing transform (`vst`). The table contains 312 columns, with one column `gene` and the remaining columns matching `sampleid`s in the metadata. There are 22,496 genes in the dataset.
 
 2.  `liu_etal_meta.csv` contains all the 29 sample-level metadata that is available for these samples and animals including `sampleid`, `studyid`, `animalid`, `visit`, `route`, `dose_group`, `log_mtb_cfu`, and `protect_outcome`.
 
@@ -85,9 +85,9 @@ ncts_ss = ncts %>% dplyr::select(any_of(keep_ids))
 filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))
 ncts_ss = ncts_ss[filter, ]
 
-# Reverse the log-transform prior to voom modeling since it will assume raw counts as input
-cts_ss <- ncts_ss %>%
-    mutate(across(-gene, ~ 2^.))
+# Move gene ID to rownames
+ncts_ss_mat <- as.matrix(ncts_ss[,-1])
+rownames(ncts_ss_mat) = ncts_ss$gene
 
 # Create the object for differential expression testing
 dge_o = DGEList(counts=cts_ss,
