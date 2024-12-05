@@ -291,7 +291,7 @@ plot_volcano(model_result = klm,
 # Scatter-plot of Gene Expression vs. log-CFU
 gene <- "TNFRSF4"
 
-ggplot(mdf, aes_string(x = "logCFU", y = gene)) +
+ggplot(mdf, aes(x = logCFU, y = get(gene))) +
   geom_point() +
   geom_smooth(method = "lm", formula = y ~ x) +
   labs(
@@ -302,7 +302,7 @@ ggplot(mdf, aes_string(x = "logCFU", y = gene)) +
   theme_minimal()
 
 # Boxplot of Gene Expression by Condition
-ggplot(mdf, aes_string(x = "condition", y = gene)) +
+ggplot(mdf, aes(x = condition, y = get(gene))) +
   geom_boxplot(outlier.shape = NA) +
   geom_jitter(width = 0.2, alpha = 0.7) +
   labs(
