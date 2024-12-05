@@ -178,42 +178,8 @@ See if you can modify the code above to test for differentially expressed genes 
 `design_temp` model.matrix and `coef` argument in `topTable` function. See below.
 
 ```{r}
-#| fig-width: 5
-#| fig-height: 3
 
-# Focus initial analysis on high-dose IV BCG group and the pre-vaccine (week 2) time point
-meta_ss = meta %>% filter(vax_group == "IV-HD" & visit == "wk2")
-keep_ids = meta_ss %>% pull(sampleid)
-keep_ids = c('gene', keep_ids)
 
-ncts_ss = ncts %>% dplyr::select(any_of(keep_ids))
-
-# Discard genes that have low counts/prevalence
-filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))
-ncts_ss = ncts_ss[filter, ]
-
-# Reverse the log-transform prior to voom modeling since it will assume raw counts as input
-cts_ss <- ncts_ss %>%
-    mutate(across(-gene, ~ 2^.))
-
-# Create the object for differential expression testing
-dge_o = DGEList(counts=cts_ss,
-                genes=cts_ss[, 1],
-                samples=meta_ss,
-                group=meta_ss[['protect_outcome']])
-
-dge_o <- calcNormFactors(dge_o, method=c("TMM"))
-
-# Specify the model/design matrix
-design_temp = model.matrix(~sex, data=meta_ss)
-
-# Create the voom object and fit the model
-v <- voomWithQualityWeights(dge_o, design=design_temp, plot=TRUE)
-
-fit = lmFit(v, design_temp)
-
-# Estimate contrasts and p-values
-fit = eBayes(fit, robust=TRUE)
 
 summary(decideTests(fit, adjust.method="fdr", p.value = 0.05))
 
