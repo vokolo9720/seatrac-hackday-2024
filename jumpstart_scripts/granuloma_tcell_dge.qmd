@@ -190,18 +190,22 @@ ncts_ss = ncts %>% dplyr::select(any_of(keep_ids))
 ncts_ss <- ncts_ss %>%
         filter(gene_id %in% gran_genes)
 
+# Move gene ID to rownames
+ncts_ss_mat <- as.matrix(ncts_ss[,-1])
+rownames(ncts_ss_mat) = ncts_ss$gene_id
+
 # FOR TESTING ALL GENES: alternatively, discard genes that have low counts/prevalence
 # filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))
 # ncts_ss = ncts_ss[filter, ]
 
 # Create the object for differential expression testing
-dge_o = DGEList(counts=ncts_ss,
-                genes=ncts_ss[, 1],
+dge_o = DGEList(counts=ncts_ss_mat,
+                genes=rownames(ncts_ss_mat),
                 samples=meta_ss,
                 group=meta_ss[['logCFU']])
 
 # Specify the model/design matrix
-design_temp = model.matrix(~logCFU, data=meta_ss)
+design_temp = model.matrix(~logCFU, data=dge_o$samples)
 
 # Create the voom object and fit the model
 v <- voomWithQualityWeights(dge_o, design=design_temp, plot=TRUE)
