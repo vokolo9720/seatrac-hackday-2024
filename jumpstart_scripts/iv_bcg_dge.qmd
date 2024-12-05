@@ -1,6 +1,9 @@
 ---
 title: "Identifying whole-blood gene expression after IV BCG in NHP that is associated with protection from Mtb challenge"
-format: html
+format:
+  html:
+    toc: true
+    self-contained: true
 editor:
   renderView: html
   sourceView: source
@@ -37,23 +40,23 @@ Load relevant packages. Change `<data_dir>` variable as appropriate.
 
 Load the pre-processed RNA sequencing data. There are two important files:
 
-1.  `liu_et_al_counts.csv` contains log-transformed/normalized counts that were computed from raw counts by the study authors using DESEQ2 variance stabilizing transform (`vst`). We will need to reverse the log-transfor to use `voom` for differential expression analysis. The table contains 312 columns, with one column `gene` and the remaining columns matching `sampleid`s in the metadata. There are 22,496 genes in the dataset.
+1.  `liu_et_al_counts.csv` contains normalized counts that were computed from raw counts by the study authors using DESEQ2 variance stabilizing transform (`vst`). The table contains 312 columns, with one column `gene` and the remaining columns matching `sampleid`s in the metadata. There are 22,496 genes in the dataset.
 
 2.  `liu_etal_meta.csv` contains all the 29 sample-level metadata that is available for these samples and animals including `sampleid`, `studyid`, `animalid`, `visit`, `route`, `dose_group`, `log_mtb_cfu`, and `protect_outcome`.
 
 ```{r}
 #| warning: false
-library(readr)
 library(tidyverse)
 library(edgeR)
+library(limma)
 library(kimma)
-library(ggplot2)
-library(dplyr)
 library(ggrepel)
+library(BIGpicture)
 
 # NOTE --- REPLACE the <data_dir> FOLDER DESTINTATION AS APPROPRIATE
-data_dir <- '/fh/fast/gilbert_p/fg_data/SEATRAC/TB_hackday_2024/processed_data'
+# data_dir <- '/fh/fast/gilbert_p/fg_data/SEATRAC/TB_hackday_2024/processed_data'
 # data_dir <- '/home/processed_data'
+data_dir <- 'data'
 
 ncts <- readr::read_csv(file.path(data_dir, "liu_etal_counts.csv"))
 meta <- readr::read_csv(file.path(data_dir, "liu_etal_metadata.csv"))
@@ -63,7 +66,7 @@ meta <- readr::read_csv(file.path(data_dir, "liu_etal_metadata.csv"))
 
 The `sampleid` columns of the `ncts` variable and the rows of `sampleid` in the `meta` variable match. For this first analysis we will focus on the NHP that received high-dose IV BCG and the blood from 2 weeks after immunization, creating subset tables indicated by `_ss` variables. Then we initialize the `DGEList` object and create a `limma` `voom` model with a design matrix to identify genes that are associated with protection.
 
-In the accompanying "mean-variance" plot the x-axis represents the average expression levels of genes across all samples. The y-axis represents the square-root of the variance (i.e., standard deviation) of gene expression levels. It shows how the variance changes with respect to the mean expression. Every dot is a gene and the trend line shows the relationship between the mean and the variance. Note that the variance is relatively stable across expression levels and the relationship is smooth; this is good for analysis and `voom` will use this relationship to adjust the model fits of each gene. If you re-run the code block without the filtering you will see the impact on the mean-variance plot.
+In the accompanying "mean-variance" plot, the x-axis represents the average expression levels of genes across all samples. The y-axis represents the square-root of the variance (i.e., standard deviation) of gene expression levels. It shows how the variance changes with respect to the mean expression. Every dot is a gene and the trend line shows the relationship between the mean and the variance. Note that the variance is relatively stable across expression levels and the relationship is smooth; this is good for analysis and `voom` will use this relationship to adjust the model fits of each gene. If you re-run the code block without the filtering you will see the impact on the mean-variance plot.
 
 Notice also that we specify a design matrix which includes covariates `sexM` (male = 1) 
 
@@ -79,23 +82,26 @@ keep_ids = c('gene', keep_ids)
 ncts_ss = ncts %>% dplyr::select(any_of(keep_ids))
 
 # Discard genes that have low counts/prevalence
+## Keep genes expressed at > 1 normalized count in at least 50% of samples
 filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))
 ncts_ss = ncts_ss[filter, ]
 
-# Reverse the log-transform prior to voom modeling since it will assume raw counts as input
-cts_ss <- ncts_ss %>%
-    mutate(across(-gene, ~ 2^.))
+# Move gene ID to rownames
+ncts_ss_mat <- as.matrix(ncts_ss[,-1])
+rownames(ncts_ss_mat) = ncts_ss$gene
 
 # Create the object for differential expression testing
-dge_o = DGEList(counts=cts_ss,
-                genes=cts_ss[, 1],
+dge_o = DGEList(counts=ncts_ss_mat,
+                genes=rownames(ncts_ss_mat),
                 samples=meta_ss,
                 group=meta_ss[['protect_outcome']])
 
-dge_o <- calcNormFactors(dge_o, method=c("TMM"))
+## Trimmed mean of means normalize
+## We skip this step because counts were previously normalized by VST. If you were working with raw counts, this would need to be completed
+# dge_o <- calcNormFactors(dge_o, method=c("TMM"))
 
 # Specify the model/design matrix
-design_temp = model.matrix(~protect_outcome + sex, data=meta_ss)
+design_temp = model.matrix(~protect_outcome + sex, data=dge_o$samples)
 
 # Create the voom object and fit the model
 v <- voomWithQualityWeights(dge_o, design=design_temp, plot=TRUE)
@@ -104,9 +110,9 @@ v <- voomWithQualityWeights(dge_o, design=design_temp, plot=TRUE)
 
 ### Exercise 
 
-Re-run the code block above without the filtering you will see the impact on the mean-variance plot. Use the code above but 
+Re-run the code block above without the filtering to see the impact on the mean-variance plot. Use the code above but 
 comment out lines `filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))` and `ncts_ss = ncts_ss[filter, ]`. 
-How does this effect the mean variance plot? **Make sure to rerun the code correctly so the object `v`
+How does this effect the mean variance plot? **Make sure to rerun the code correctly before continuing to the next section so the object `v`
 includes filtering sparsely detected genes.*
 
 
@@ -118,15 +124,14 @@ fit = lmFit(v, design_temp)
 # Estimate contrasts and p-values
 fit = eBayes(fit, robust=TRUE)
 
-summary(decideTests(fit, adjust.method="fdr", p.value = 0.05))
+summary(decideTests(fit, adjust.method="fdr", p.value = 0.2))
 
 results <- topTable(fit, adjust="BH", coef="protect_outcomeprotected", p.value=1, number=Inf, resort.by="P")
 
-head(results %>% dplyr::select(gene, logFC, AveExpr, P.Value, adj.P.Val), 20)
+head(results %>% dplyr::select(genes, logFC, AveExpr, P.Value, adj.P.Val), 20)
 ```
 
 ## Create a volcano plot for single-gene association with protection
-
 
 A volcano plot shows log fold-change on the x-axis and negative log10-transformed p-value on the y-axis. Each dot represents a gene. 
 In this case fold change is based on grouping variable of `protection_outcome` protected and un-protected, with points the 
@@ -148,12 +153,12 @@ top_genes <- results %>%
 max_logFC <- max(abs(results$logFC), na.rm = TRUE)
 
 # Create the volcano plot
-volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
+volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(adj.P.Val))) +
   geom_point(aes(color = Significance), alpha = 0.6) +
   scale_color_manual(values = c("Significant" = "red", "Not Significant" = "grey")) +
   geom_text_repel(data = top_genes,
-                  aes(label = gene),
-                  max.overlaps = 10,
+                  aes(label = genes),
+                  max.overlaps = Inf,
                   box.padding = 0.3,
                   point.padding = 0.3,
                   segment.color = "grey50",
@@ -162,79 +167,50 @@ volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
   theme_minimal() +
   labs(
        x = "log2 Fold-change (protection status)",
-       y = "-log10 P-value",
-       color = "FDR < 0.05") +
+       y = "-log10 FDR",
+       color = "FDR < 0.2") +
   theme(plot.title = element_text(hjust = 0.5))
 volcano_plot
 ```
 
 ## See if there are any genes significantly associated with sex of the animals
 
-See if you can modify the code above to test for differentially expressed genes in the male animals. Change the 
-`design_temp` model.matrix and `coef` argument in `topTable` function. See below.
+In the prior model, we see some differences by sex.
+
+```{r}
+summary(decideTests(fit, adjust.method="fdr", p.value = 0.2))
+```
+
+See if you can modify the code from above (copied below) to test for differentially expressed genes in the male animals. Change the `coef` argument in `topTable` function.
 
 ```{r}
 #| fig-width: 5
 #| fig-height: 3
 
-# Focus initial analysis on high-dose IV BCG group and the pre-vaccine (week 2) time point
-meta_ss = meta %>% filter(vax_group == "IV-HD" & visit == "wk2")
-keep_ids = meta_ss %>% pull(sampleid)
-keep_ids = c('gene', keep_ids)
-
-ncts_ss = ncts %>% dplyr::select(any_of(keep_ids))
-
-# Discard genes that have low counts/prevalence
-filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))
-ncts_ss = ncts_ss[filter, ]
-
-# Reverse the log-transform prior to voom modeling since it will assume raw counts as input
-cts_ss <- ncts_ss %>%
-    mutate(across(-gene, ~ 2^.))
-
-# Create the object for differential expression testing
-dge_o = DGEList(counts=cts_ss,
-                genes=cts_ss[, 1],
-                samples=meta_ss,
-                group=meta_ss[['protect_outcome']])
-
-dge_o <- calcNormFactors(dge_o, method=c("TMM"))
-
-# Specify the model/design matrix
-design_temp = model.matrix(~sex, data=meta_ss)
-
-# Create the voom object and fit the model
-v <- voomWithQualityWeights(dge_o, design=design_temp, plot=TRUE)
-
-fit = lmFit(v, design_temp)
-
-# Estimate contrasts and p-values
-fit = eBayes(fit, robust=TRUE)
-
-summary(decideTests(fit, adjust.method="fdr", p.value = 0.05))
+#Use the same voom object and model fit
 
 results <- topTable(fit, adjust="BH", coef="sexM", p.value=1, number=Inf, resort.by="P")
 
-head(results %>% dplyr::select(gene, logFC, AveExpr, P.Value, adj.P.Val), 20)
+head(results %>% dplyr::select(genes, logFC, AveExpr, P.Value, adj.P.Val), 20)
 
 # Add a column for significance based on FDR
 results <- results %>%
-  mutate(Significance = ifelse(adj.P.Val < 0.05, "Significant", "Not Significant"))
+  mutate(Significance = ifelse(adj.P.Val < 0.2, "Significant", "Not Significant"))
 
 # Select the top 10 genes based on adjusted p-value for labeling
 top_genes <- results %>%
   arrange(adj.P.Val) %>%
-  slice_head(n = 30)
+  slice_head(n = 10)
 
 max_logFC <- max(abs(results$logFC), na.rm = TRUE)
 
 # Create the volcano plot
-volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
+volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(adj.P.Val))) +
   geom_point(aes(color = Significance), alpha = 0.6) +
   scale_color_manual(values = c("Significant" = "red", "Not Significant" = "grey")) +
   geom_text_repel(data = top_genes,
-                  aes(label = gene),
-                  max.overlaps = 10,
+                  aes(label = genes),
+                  max.overlaps = Inf,
                   box.padding = 0.3,
                   point.padding = 0.3,
                   segment.color = "grey50",
@@ -243,14 +219,16 @@ volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
   theme_minimal() +
   labs(
        x = "log2 Fold-change (sexM)",
-       y = "-log10 P-value",
-       color = "FDR < 0.05") +
+       y = "-log10 FDR",
+       color = "FDR < 0.2") +
   theme(plot.title = element_text(hjust = 0.5))
 volcano_plot
 ```
 
 
 ## Redo the analysis using a mixed-effects model to incorporate data from additional visits and account for the longitudinal design
+
+First, make a new voom object with two time points (day 2 and week 2).
 
 ```{r}
 meta_ss = meta %>% filter(vax_group == "IV-HD" & (visit == "wk2" | visit == "d2"))
@@ -260,37 +238,60 @@ keep_ids = c('gene', keep_ids)
 ncts_ss = ncts %>% dplyr::select(any_of(keep_ids))
 
 # Discard genes that have low counts/prevalence
+## Keep genes expressed at > 1 normalized count in at least 50% of samples
 filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))
 ncts_ss = ncts_ss[filter, ]
 
-# Reverse the log-transform prior to voom modeling since it will assume raw counts as input
-cts_ss <- ncts_ss %>%
-    mutate(across(-gene, ~ 2^.))
+# Move gene ID to rownames
+ncts_ss_mat <- as.matrix(ncts_ss[,-1])
+rownames(ncts_ss_mat) = ncts_ss$gene
 
-dge_o = DGEList(counts=ncts_ss,
-                genes=ncts_ss[, 1],
+dge_o = DGEList(counts=ncts_ss_mat,
+                genes=rownames(ncts_ss_mat),
                 samples=meta_ss,
                 group=meta_ss[['protect_outcome']])
 
-dge_o <- calcNormFactors(dge_o, method=c("TMM"))
+## We skip this step because counts were previously normalized by VST. If you were working with raw counts, this would need to be completed
+# dge_o <- calcNormFactors(dge_o, method=c("TMM"))
 
-design_temp=model.matrix(~protect_outcome + sex + visit, data=meta_ss)
+design_temp=model.matrix(~protect_outcome + visit + sex, data=dge_o$samples)
 
 v <- voomWithQualityWeights(dge_o, design=design_temp, plot=FALSE)
+```
 
-klm <- kmFit(dat = v,
-             model = "~protect_outcome + sex + visit + (1|animalid)",
-             run_lme = TRUE,
-             libraryID="sampleid",
-             patientID="animalid",
-             use_weights = TRUE,
-             metrics = TRUE,
-             run_contrast = FALSE,
-             processors=1)
+Then use kimma to fit a mixed effects model.
+
+```{r}
+klm <- kmFit(
+  dat = v,
+  model = "~protect_outcome + visit + sex + (1|animalid)",
+  run_lme = TRUE, 
+  run_contrast = FALSE,
+  libraryID="sampleid",
+  patientID="animalid",
+  use_weights = TRUE,
+  metrics = FALSE,
+  processors=6)
 
 summarise_kmFit(fdr = klm$lm)
 
+# BIGpicture has a nice wrapper for volcano plots
 plot_volcano(model_result = klm, 
-             model = "lm", variables = "protect_outcomeprotected",
-             y_cutoff = 0.05)
+             model = "lme", variables = "protect_outcome",
+             y_cutoff = 0.2, label = 10)
 ```
+If you want to delve deeper into the pairwise comparisons within the interaction term (e.g. what is the effect time in each protection outcome?), try running kimma contrasts and exploring the output `klm$lme.contrast`. This will take several minutes to run.
+
+```{r eval=FALSE}
+klm <- kmFit(
+  dat = v,
+  model = "~protect_outcome*visit + sex + (1|animalid)", #Include interaction
+  run_lme = TRUE, 
+  run_contrast = TRUE, contrast_var="protect_outcome:visit", #Run contrasts
+  libraryID="sampleid",
+  patientID="animalid",
+  use_weights = TRUE,
+  metrics = FALSE,
+  processors=6)
+```
+

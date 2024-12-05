@@ -1,6 +1,9 @@
 ---
 title: "Identify granuloma associated T cell genes and validate in single-cell data"
-format: html
+format:
+  html:
+    toc: true
+    self-contained: true
 editor:
   renderView: html
   sourceView: source
@@ -47,19 +50,22 @@ Load the pre-processed RNA sequencing data. There are several important files:
 
 ```{r}
 #| warning: false
-library(dplyr)       # For data manipulation
-library(ggplot2)     # For data visualization
-library(readr)       # For reading CSV/TSV files
-library(tidyr)       # For reshaping data
+library(tidyverse)   # For data manipulation and plotting
 library(stats)       # For basic statistical tests
 library(multcomp)    # For multiple comparison corrections
 library(lme4)        # For mixed-effects modeling
 library(broom)       # For tidying model outputs
 library(data.table)  # Efficient data handling
+library(edgeR)       # RNAseq data processing
+library(limma)       # RNAseq linear models
+library(ggrepel)     # Label points in scatterplot
+library(kimma)       # RNAseq linear mixed effects models
+library(BIGpicture)  # RNAseq plots
+select <- dplyr::select
 
 # NOTE --- REPLACE the <data_dir> FOLDER DESTINTATION AS APPROPRIATE
-
-data_dir <- '/home/processed_data'
+# data_dir <- '/home/processed_data'
+data_dir <- "data/"
 
 # These are already log2-CPM
 ncts <- readr::read_csv(file.path(data_dir, "foreman_etal_counts.csv"))
@@ -80,14 +86,14 @@ Steps for analysis:
 4. Apply Mann-Whitney test across all genes and collect the results
 5. Print the top 20 results with an estimated FDR q-value
 
-```{r}
+```{r warning=FALSE}
 # Section 4: Filter genes for analysis
 # ------------------------------------
 ltpm <- ncts %>%
   column_to_rownames("gene_id") %>%
   filter(rowMeans(. > 1) > 0.6)
 
-genes <- rownames(ltpm)
+genes_filter <- rownames(ltpm)
 
 # Merge metadata and log-transformed counts
 meta_ss <- meta %>%
@@ -106,7 +112,7 @@ mdf <- meta_ss %>%
 # ----------------------------------------------------
 
 # Convert mdf to a matrix for gene expression data
-expression_data <- as.matrix(mdf %>% select(all_of(genes)))
+expression_data <- as.matrix(mdf %>% select(all_of(genes_filter)))
 conditions <- mdf$condition
 
 # Precompute the grouping indices for faster sub-setting
@@ -143,7 +149,7 @@ collect_res_matrix <- function(expression_data, gran_idx, pbmc_idx, genes) {
     }
 
 # Run the matrix-optimized function
-results_df <- collect_res_matrix(expression_data, gran_idx, pbmc_idx, genes)
+results_df <- collect_res_matrix(expression_data, gran_idx, pbmc_idx, genes_filter)
 
 # Adjust p-values for multiple comparisons
 results_df <- results_df %>%
@@ -184,31 +190,37 @@ ncts_ss = ncts %>% dplyr::select(any_of(keep_ids))
 ncts_ss <- ncts_ss %>%
         filter(gene_id %in% gran_genes)
 
+# Move gene ID to rownames
+ncts_ss_mat <- as.matrix(ncts_ss[,-1])
+rownames(ncts_ss_mat) = ncts_ss$gene_id
+
 # FOR TESTING ALL GENES: alternatively, discard genes that have low counts/prevalence
 # filter = rowSums(ncts_ss > 1) >= (0.5 * ncol(ncts_ss))
 # ncts_ss = ncts_ss[filter, ]
 
 # Create the object for differential expression testing
-dge_o = DGEList(counts=ncts_ss,
-                genes=ncts_ss[, 1],
+dge_o = DGEList(counts=ncts_ss_mat,
+                genes=rownames(ncts_ss_mat),
                 samples=meta_ss,
                 group=meta_ss[['logCFU']])
 
 # Specify the model/design matrix
-design_temp = model.matrix(~logCFU, data=meta_ss)
+design_temp = model.matrix(~logCFU, data=dge_o$samples)
 
 # Create the voom object and fit the model
 v <- voomWithQualityWeights(dge_o, design=design_temp, plot=TRUE)
+
+#Fit model
 fit = lmFit(v, design_temp)
 
 # Estimate contrasts and p-values
 fit = eBayes(fit, robust=TRUE)
 
-summary(decideTests(fit, adjust.method="fdr", p.value = 0.05))
+summary(decideTests(fit, adjust.method="fdr", p.value = 0.2))
 
 results <- topTable(fit, adjust="BH", coef="logCFU", p.value=1, number=Inf, resort.by="P")
 
-head(results %>% dplyr::select(gene_id, logFC, AveExpr, P.Value, adj.P.Val), 20)
+head(results %>% dplyr::select(genes, logFC, AveExpr, P.Value, adj.P.Val), 20)
 ```
 
 ## Create a volcano plot for single-gene association with protection
@@ -233,7 +245,7 @@ volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
   geom_point(aes(color = Significance), alpha = 0.6) +
   scale_color_manual(values = c("Significant" = "red", "Not Significant" = "grey")) +
   geom_text_repel(data = top_genes,
-                  aes(label = gene_id),
+                  aes(label = genes),
                   max.overlaps = 10,
                   box.padding = 0.3,
                   point.padding = 0.3,
@@ -242,28 +254,20 @@ volcano_plot <- ggplot(results, aes(x = logFC, y = -log10(P.Value))) +
   xlim(c(-max_logFC, max_logFC)) +
   theme_minimal() +
   labs(
-    x = "log2 Fold-change",
+    x = "log2 Estimate",
     y = "-log10 P-value",
-    color = "FDR < 0.05") +
+    color = "FDR < 0.2") +
   theme(plot.title = element_text(hjust = 0.5))
 
 volcano_plot
 ```
 
-## Redo the analysis using a mixed-effects model to incorporate data from additional visits and account for the longitudinal design
+## Redo the analysis using a mixed-effects model to incorporate repeated measures
+
+Using kimma, perform the same analysis for CFU only now taking into account the within animal variability with multiple granulomas samples from the same animal. We will still focus on CD4+ cells from granulomas.
 
 ```{r}
-# Redo the analysis using a mixed-effects model to account for the longitudinal design
-dge_o = DGEList(counts=ncts_ss,
-                genes=ncts_ss[, 1],
-                samples=meta_ss,
-                group=meta_ss[['logCFU']])
-
-ncts_ss <- calcNormFactors(dge_o, method = "TMM")
-
-design_temp=model.matrix(~logCFU, data=meta_ss)
-
-v <- voomWithQualityWeights(dge_o, design=design_temp, plot=FALSE)
+# Use the same voom object as with limma
 
 klm <- kmFit(dat = v,
              model = "~logCFU + (1|subject)",
@@ -271,15 +275,14 @@ klm <- kmFit(dat = v,
              libraryID="sampleid",
              patientID="subject",
              use_weights = TRUE,
-             metrics = TRUE,
-             run_contrast = FALSE,
+             metrics = FALSE,
              processors=1)
 
 summarise_kmFit(fdr = klm$lme)
 
 plot_volcano(model_result = klm,
              model = "lme", variables = "logCFU",
-             y_cutoff = 0.05)
+             y_cutoff = 0.2, label = 10)
 
 ```
 
@@ -290,7 +293,7 @@ plot_volcano(model_result = klm,
 # Scatter-plot of Gene Expression vs. log-CFU
 gene <- "TNFRSF4"
 
-ggplot(mdf, aes_string(x = "logCFU", y = gene)) +
+ggplot(mdf, aes(x = logCFU, y = get(gene))) +
   geom_point() +
   geom_smooth(method = "lm", formula = y ~ x) +
   labs(
@@ -301,7 +304,7 @@ ggplot(mdf, aes_string(x = "logCFU", y = gene)) +
   theme_minimal()
 
 # Boxplot of Gene Expression by Condition
-ggplot(mdf, aes_string(x = "condition", y = gene)) +
+ggplot(mdf, aes(x = condition, y = get(gene))) +
   geom_boxplot(outlier.shape = NA) +
   geom_jitter(width = 0.2, alpha = 0.7) +
   labs(
@@ -315,7 +318,7 @@ ggplot(mdf, aes_string(x = "condition", y = gene)) +
 
 We can use the Bromley
 
-```{r}
+```{r warning=FALSE}
 # Load Bromley data
 brom <- read_csv(file.path(data_dir, "bromley_coarse_pseudobulk_counts.csv"))
 bmeta <- read_csv(file.path(data_dir, "bromley_coarse_pseudobulk_counts.meta.csv"))
@@ -421,4 +424,4 @@ ggplot(ss_top, aes(x = cpm, y = logCFU)) +
     y = "logCFU"
   ) +
   theme_minimal()
-  ```
+```
