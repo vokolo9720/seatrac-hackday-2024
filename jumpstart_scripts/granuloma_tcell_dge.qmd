@@ -17,7 +17,7 @@ This TB Hackday script uses (pre-processed) RNA sequencing data from the followi
 
 Then the expression of these genes can be further examined and validated using pseudo-bulk transcriptomic data from scRNAseq data in this study:
 
-1.  [Bromley et al. 2024](https://pubmed.ncbi.nlm.nih.gov/39214090/) (Immunity) **CD4+ T cells re-wire granuloma cellularity and regulatory networks to promote immunomodulation following Mtb reinfection**
+1.  [Bromley et al. 2024](https://pubmed.ncbi.nlm.nih.gov/39214090/) (*Immunity*) **CD4+ T cells re-wire granuloma cellularity and regulatory networks to promote immunomodulation following Mtb reinfection**
 
 ## Background
 
@@ -64,8 +64,9 @@ library(BIGpicture)  # RNAseq plots
 select <- dplyr::select
 
 # NOTE --- REPLACE the <data_dir> FOLDER DESTINTATION AS APPROPRIATE
-# data_dir <- '/home/processed_data'
-data_dir <- "data/"
+data_dir <- '/home/processed_data'
+# data_dir <- '/fh/fast/gilbert_p/fg_data/SEATRAC/TB_hackday_2024/processed_data'
+# data_dir <- "data/"
 
 # These are already log2-CPM
 ncts <- readr::read_csv(file.path(data_dir, "foreman_etal_counts.csv"))
@@ -87,7 +88,7 @@ Steps for analysis:
 5. Print the top 20 results with an estimated FDR q-value
 
 ```{r warning=FALSE}
-# Section 4: Filter genes for analysis
+# Filter genes for analysis
 # ------------------------------------
 ltpm <- ncts %>%
   column_to_rownames("gene_id") %>%
@@ -108,7 +109,7 @@ mdf <- meta_ss %>%
   rownames_to_column("sampleid") %>%
   bind_cols(t(ltpm_ss))  # Ensure samples (columns of ltpm) match rows of meta
 
-# Section 5: Mann-Whitney U Test for Gene Associations
+# Mann-Whitney U Test for Gene Associations
 # ----------------------------------------------------
 
 # Convert mdf to a matrix for gene expression data
@@ -314,9 +315,10 @@ ggplot(mdf, aes(x = condition, y = get(gene))) +
   ) +
   theme_minimal()
 ```
+
 ## Use the Bromley et al. data to identify cells that express protective genes and validate their association with protection
 
-We can use the Bromley
+Load the pseudo-bulk data from Bromley et al. (2024). Note above that it can be loaded with two different granularity of clusters: coarse vs. subclusters. Below we just do a simple rank correlation of gene expression (CPM) with log-CFU (across granulomas) to see which of the genes from the above analysis correlate with protection in these experiments, and in which cell cluster.
 
 ```{r warning=FALSE}
 # Load Bromley data
@@ -386,6 +388,12 @@ res_df <- do.call(rbind, res) %>%
 
 print(res_df)
 ```
+Note how higher *TNF* expression is associated with lower CFU when expressed in T,NK cells, but is associated with higher CFU when expressed in neutrophils. There are several genes with this pattern. Is it driven by NHP in one group or another? Or is it driven by the group effect overall?
+
+## Visualize single gene expression by cluster and group
+
+It's helpful to visualize this pattern for one gene using boxplots by group and cell cluster. It might be interesting to look at the sub-clusters too.
+
 
 ```{r}
 # Extract the top gene and cluster
@@ -410,6 +418,8 @@ ggplot(ss, aes(x = cpm, y = CoarseClustering, color = Group)) +
   ) +
   theme_minimal()
 ```
+
+## Visualize correlation of one gene in one cluster with CFU
 
 ```{r}
 # Visualization: Scatterplot of cpm vs logCFU for the top cluster

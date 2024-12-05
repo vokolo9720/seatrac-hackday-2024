@@ -55,8 +55,8 @@ library(BIGpicture)
 
 # NOTE --- REPLACE the <data_dir> FOLDER DESTINTATION AS APPROPRIATE
 # data_dir <- '/fh/fast/gilbert_p/fg_data/SEATRAC/TB_hackday_2024/processed_data'
-# data_dir <- '/home/processed_data'
-data_dir <- 'data'
+data_dir <- '/home/processed_data'
+# data_dir <- 'data'
 
 ncts <- readr::read_csv(file.path(data_dir, "liu_etal_counts.csv"))
 meta <- readr::read_csv(file.path(data_dir, "liu_etal_metadata.csv"))
