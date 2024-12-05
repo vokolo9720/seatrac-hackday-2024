@@ -1,6 +1,9 @@
 ---
 title: "Identify granuloma associated T cell genes and validate in single-cell data"
-format: html
+format:
+  html:
+    toc: true
+    self-contained: true
 editor:
   renderView: html
   sourceView: source

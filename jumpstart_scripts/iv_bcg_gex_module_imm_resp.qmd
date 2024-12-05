@@ -1,6 +1,9 @@
 ---
 title: "Can the adaptive responses to IV BCG be predicted from baseline or early-BCG gene expression in whole-blood?"
-format: html
+format:
+  html:
+    toc: true
+    self-contained: true
 editor:
   renderView: html
   sourceView: source

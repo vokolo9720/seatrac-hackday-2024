@@ -1,6 +1,9 @@
 ---
 title: "Exploring immune responses to i.v. BCG and protection from subsequent Mtb Challenge"
-format: html
+format:
+  html:
+    toc: true
+    self-contained: true
 editor: source
 ---
 

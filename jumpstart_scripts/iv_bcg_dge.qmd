@@ -1,6 +1,9 @@
 ---
 title: "Identifying whole-blood gene expression after IV BCG in NHP that is associated with protection from Mtb challenge"
-format: html
+format:
+  html:
+    toc: true
+    self-contained: true
 editor:
   renderView: html
   sourceView: source
