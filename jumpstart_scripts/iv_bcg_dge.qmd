@@ -174,14 +174,19 @@ volcano_plot
 
 ## See if there are any genes significantly associated with sex of the animals
 
-See if you can modify the code above to test for differentially expressed genes in the male animals. Change the 
-`design_temp` model.matrix and `coef` argument in `topTable` function. See below.
+In the prior model, we see some differences by sex.
 
 ```{r}
+summary(decideTests(fit, adjust.method="fdr", p.value = 0.2))
+```
 
+See if you can modify the code from above (copied below) to test for differentially expressed genes in the male animals. Change the `coef` argument in `topTable` function.
 
+```{r}
+#| fig-width: 5
+#| fig-height: 3
 
-summary(decideTests(fit, adjust.method="fdr", p.value = 0.05))
+#Use the same voom object and model fit
 
 results <- topTable(fit, adjust="BH", coef="sexM", p.value=1, number=Inf, resort.by="P")
 
