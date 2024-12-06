@@ -1,8 +1,9 @@
-# SEATRAC TB Hackday
-
+# SEATRAC TB Hackday 2024
 Tuesday, December 10, 2024
-9 AM to 4 PM (EDT and PDT)
-(see [Agenda](https://github.com/FredHutch/seatrac-hackday-2024/blob/main/agenda.md) for details)
+
+9 AM to 3 PM EDT
+
+9 AM to 3 PM PDT
 
 ## Seattle:
 Fred Hutchinson Cancer Center
@@ -12,24 +13,54 @@ O’Mack Symposium Suite
 
 [FH Campus Map](https://www.fredhutch.org/en/about/contact-us/campus-map.html)
 
-## Emory:
-UPDATE LOCTION INFO HERE
-
+## Emory University:
+Emory Rollins School of Public Health
+Claudia Nance Rollins Building, Room 3001
+1518 Clifton Road NE, Atlanta, GA 30322
 
 ## Virtual:
 
-Zoom ([Zoom link, registration required](new_link_needed)). 
+Zoom ([Zoom link](https://us02web.zoom.us/j/82494563007?from=addon)). 
+
+Github link: [FredHutch/seatrac-hackday-2024](https://github.com/FredHutch/seatrac-hackday-2024)
+
+## Agenda
+
+The event will be starting in-person at Emory at 9 AM (EDT). Folks in Seattle will start in-person at 9 AM (PDT).
+There will be a JOINT Seattle/Emory session at 12 PM PDT / 3 PM EDT to share hackday progress.
+
+| Emory (EDT) | Seattle (PDT) | Activity |
+|-------------|---------------|----------|
+| 9:00 AM     |               | Alex Shalek presenting on correlates of protection for IV BCG and Mtb immunity in NHP (live) |
+| 9:45        |               | Opening remarks (Shuyi Ma, Andrew Fiore-Gartland) |
+| 10:00       |               | Small group session: devise questions, hypotheses and analysis plans |
+| 10:30       |               | Open hack time at Emory |
+|             | 8:30 AM       | Gather with coffee and light breakfast |
+|             | 9:00          | Opening remarks (Shuyi Ma, Andrew Fiore-Gartland) |
+|             | 9:15          | Alex Shalek on correlates of protection for IV BCG and Mtb immunity in NHP (re-broadcast) |
+|             | 10:00         | Small group session: devise questions, hypotheses and analysis plans |
+|             | 10:30         | Open hack time in Seattle |
+| 3:00 PM     | 12:00 PM      | **JOINT**<br>Small group readouts from Emory: Each group shares preliminary figures, analysis plans, code chunks |
+|             | 3:00          | Small group readouts from Seattle |
 
 ## Objectives
 
 Learning, teaching and collaborating! Collaborating in small groups to develop new analytical insights from published bulk and single-cell RNAseq datasets that profile NHP host gene expression during Mtb infection and BCG vaccination.
 
-Datasets: PMIDs: 37097292, 35483355, 37267955, 37390827
+Datasets: PMIDs: 37097292, 35483355, 37267955, 37390827, 39214090
 
 Breakfast included starting at 8:30am, lunch included at noon, happy hour snacks included starting at 3pm.
 
 Registration: 
 [Online registration](https://bit.ly/3ZdQbUq)
+
+## Jumpstart scripts
+
+Use these scripts/tutorials to get you going faster with the datasets:
+1. [Identifying whole-blood gene expression after IV BCG in NHP that is associated with protection from Mtb challenge](https://github.com/FredHutch/seatrac-hackday-2024/blob/main/jumpstart_scripts/iv_bcg_dge.qmd)
+2. [Can the adaptive responses to IV BCG be predicted from baseline or early-BCG gene expression in whole-blood?](https://github.com/FredHutch/seatrac-hackday-2024/blob/main/jumpstart_scripts/iv_bcg_gex_module_imm_resp.qmd)
+3. [Exploring immune responses to i.v. BCG and protection from subsequent Mtb Challenge](https://github.com/FredHutch/seatrac-hackday-2024/blob/main/jumpstart_scripts/iv_bcg_immune_correlates.qmd)
+4. [Identify granuloma associated T cell genes and validate in single-cell dataset](https://github.com/FredHutch/seatrac-hackday-2024/blob/main/jumpstart_scripts/granuloma_tcell_dge.qmd)
 
 ## Tutorials from TB Lunch & Learn sessions
 
@@ -39,19 +70,16 @@ Registration:
 
 # Datasets
 
-Link to aggregated datasets on [Figshare](https://figshare.com/articles/dataset/SEATRAC_TB_Hackday_2023/24425053)
+Link to aggregated datasets on [Figshare](https://figshare.com/articles/dataset/SEATRAC_TB_Hackday_2024/27774420)
 
 Foreman et al., 2023: bulk RNAseq from sorted cells in NHP Mtb challenge model 
-
-Gideon et al., 2022: scRNAseq from granulomas in NHP Mtb challenge model
 
 Darrah et al., 2023: scRNAseq from BAL in NHP Mtb challenge (BCG route, correlates of protection) 
 
 Liu et al., 2023: whole-blood bulk RNAseq from NHP Mtb challenge (BCG route and IV BCG dose, should match Darrah et al. study) 
 
+Bromley et al., 2024: scRNAseq from granulomas during primary and secondary Mtb infection
  
-NOTE: For the Gideon et al. and Darrah et al. single-cell datasets there is also a pseudo-bulk dataset that was created by summing raw counts across cells within a sample and an annotated cell type. Cell annotations from the original data were used for the summation. The resulting CSV contains counts for each sample, cell type and gene.
-
 ---
 
 ## Foreman et al., 2023: bulk RNAseq from sorted cells in NHP Mtb challenge model 
@@ -70,28 +98,6 @@ https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE228114 for the superset th
 https://github.com/FredHutch/seatrac-hackday-2023/tree/main/foreman_etal
 
 DATA SUMMARY: N=4 Rhesus macaques, Mtb. challenge (40–80 CFU of Mtb-Erdman-mCherry and euthanized 6–7 wk after infection); bulk RNAseq from FACS sorted T cells; [bulk RNAseq count data](https://github.com/FredHutch/seatrac-hackday-2023/blob/main/foreman_etal/GSE227653_TPM_all.csv.gz) is stored for CD4 and CD8 T cells in units of transcript per million (TPM).
-
----
-
-## Gideon et al., 2022: scRNAseq from granulomas in NHP Mtb challenge model 
-
-Gideon HP, Hughes TK, Tzouanas CN, Wadsworth MH 2nd, Tu AA, Gierahn TM, Peters JM, Hopkins FF, Wei JR, Kummerlowe C, Grant NL, Nargan K, Phuah JY, Borish HJ, Maiello P, White AG, Winchell CG, Nyquist SK, Ganchua SKC, Myers A, Patel KV, Ameel CL, Cochran CT, Ibrahim S, Tomko JA, Frye LJ, Rosenberg JM, Shih A, Chao M, Klein E, Scanga CA, Ordovas-Montanes J, Berger B, Mattila JT, Madansein R, Love JC, Lin PL, Leslie A, Behar SM, Bryson B, Flynn JL, Fortune SM, Shalek AK. Multimodal profiling of lung granulomas in macaques reveals cellular correlates of tuberculosis control. Immunity. 2022 May 10;55(5):827-846.e10. doi: 10.1016/j.immuni.2022.04.004. Epub 2022 Apr 27. PMID: 35483355; PMCID: PMC9122264. 
-
-PDF: [github](https://github.com/FredHutch/seatrac-hackday-2023/blob/main/gideon_etal/Gideon%20et%20al.%20NHP%20granulomas%20Immunity%202022.pdf)
-MS: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9122264/
-
-> "We have performed high-throughput single-cell mRNA sequencing on 6 granulomas from 2 non-human primates at 4 weeks post infection with M. tuberculosis to understand cellular and molecular factors associated with bacterial control (n = 10,006 cells)."
->
-> "We have performed high-throughput single-cell mRNA sequencing on 26 granulomas from 4 non-human primates at 10 weeks post infection with M. tuberculosis to understand cellular and molecular factors associated with bacterial control (n = 109,584 cells)"
-
- 
-DATA 4 WKS: [Alexandria](https://singlecell.broadinstitute.org/single_cell/study/SCP1749/cellular-ecology-of-m-tuberculosis-granulomas-4-week-dataset#study-summary); [Github](https://github.com/FredHutch/seatrac-hackday-2023/tree/main/gideon_etal/4week); [Figshare](https://figshare.com/account/articles/24425053)
-
-DATA 10 WKS: https://singlecell.broadinstitute.org/single_cell/study/SCP257/cellular-ecology-of-m-tuberculosis-granulomas-10-week-dataset#study-summary 
-
-Single-cell data is on [Figshare](https://figshare.com/account/articles/24425053)
-
-DATA SUMMARY: single-cell RNAseq (SeqWell); 6 granulomas from 2 NHP at 4 wks and 26 granulomas from 4 NHP at 10 weeks post-infection (includes CFU per granuloma) 
 
 ---
 ## Darrah et al., 2023: scRNAseq from BAL in NHP Mtb challenge (BCG route, correlates of protection) 
@@ -119,10 +125,17 @@ Liu YE, Darrah PA, Zeppa JJ, Kamath M, Laboune F, Douek DC, Maiello P, Roederer 
 PDF: [github](https://github.com/FredHutch/seatrac-hackday-2023/blob/main/liu_etal/Liu%20et%20al%20IV%20BCG%20NHP%20mRNA%202023.pdf)
 MS: https://www.sciencedirect.com/science/article/pii/S266637912300215X?via%3Dihub#sec4.1 
 
-
 DATA IV BCG DOSE STUDY (167 samples, 34 NHP): https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE218270 
 
 DATA BCG ROUTE STUDY (144 samples, 36 NHP):  https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE218157 
 
- 
 DATA SUMMARY: Darah et al.  IV BCG dose and BCG route study matching; Pre BCG and Day 2, Wk 4, Wk 12 for IV BCG dose study;  Pre, Day 2, Wk2 and Wk12 for route study; bulk RNAseq from whole blood; includes protection data for each individual NHP 
+
+---
+## Bromley et al., 2024: scRNAseq from granulomas during primary and secondary Mtb infection
+Bromley JD, Ganchua SKC, Nyquist SK, Maiello P, Chao M, Borish HJ, Rodgers M, Tomko J, Kracinovsky K, Mugahid D, Nguyen S, Wang QD, Rosenberg JM, Klein EC, Gideon HP, Floyd-O'Sullivan R, Berger B, Scanga CA, Lin PL, Fortune SM, Shalek AK, Flynn JL. CD4+ T cells re-wire granuloma cellularity and regulatory networks to promote immunomodulation following Mtb reinfection. Immunity. 2024 Oct 8;57(10):2380-2398.e6. doi: 10.1016/j.immuni.2024.08.002. Epub 2024 Aug 29. PMID: 39214090; PMCID: PMC11466276.
+
+PDF: [github](https://github.com/FredHutch/seatrac-hackday-2024/blob/main/bromley_etal/Bromley%20et%20al%20CD4%20T%20cells%20re-wire%20granuloma%20cellularity%2C%20Immunity%2C%202024.pdf)
+MS: [PubMed](https://pubmed.ncbi.nlm.nih.gov/39214090/) 
+
+Bromley et al. report on an experiment with three groups of cynomolgus macaques: (1) anti-CD4 treated, Mtb-exposed (n=7), (2) IgG control, Mtb-exposed (n=6), (3) No treatment, Mtb-naive (n=6). Groups (2) and (3) were infected with Mtb, then given an anti-CD4 antibody to deplete CD4+ T cells or an isotype control (IgG) antibody, and finally challenged with a secondary Mtb infection. Group 3 only received a primary Mtb infection. Granulomas were then analyzed using single-cell RNAseq, with 3 NHP from (1) and 2 NHP from (2) and (3) each. We have created pseudo-bulk datasets using two different clustering of the cells, offering two levels of cell type granularity for analysis: `bromley_X_pseudobulk_counts.csv` where `X` is `coarse` or `subclustering`, with clusters defined by the authors of the manuscript. By analyzing data from primary infection, reinfection, and reinfection-CD4+ T cell-depleted granulomas, they found that the presence of CD4+ T cells during reinfection resulted in a less inflammatory lung milieu characterized by reprogrammed CD8+ T cells, reduced neutrophilia, and blunted type 1 immune signaling among myeloid cells.
