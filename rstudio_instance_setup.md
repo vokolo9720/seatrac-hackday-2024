@@ -27,9 +27,9 @@
 Pull the latest container from dockerhub.com and launch. Port is specified as `-p [host]:[container]`. Note that running docker container in interactive mode seems to eventually lead to an unstable RStudio session. Use `-d` instead of `-it` and detach once container is configured.
 
 ```
-docker pull afioregartland/hackday-rstudio
-docker run -d -p 8787:8787 -e PASSWORD=dude97 --name hackday_rstudio afioregartland/hackday-rstudio:latest
-docker exec -it hackday_rstudio /bin/bash
+sudo docker pull afioregartland/hackday-rstudio
+sudo docker run -d -p 8787:8787 -e PASSWORD=dude97 --name hackday_rstudio afioregartland/hackday-rstudio:latest
+sudo docker exec -it hackday_rstudio /bin/bash
 ```
 
 ## Setup the RStudio container
