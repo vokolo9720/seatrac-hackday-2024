@@ -20,9 +20,9 @@ Claudia Nance Rollins Building, Room 3001
 
 ## Virtual:
 
-Zoom ([Zoom link, registration required](https://us02web.zoom.us/j/82494563007?from=addon)). 
+Zoom ([Zoom link](https://us02web.zoom.us/j/82494563007?from=addon)). 
 
-Github link: [FredHutch/seatrac-hackday-2023](https://github.com/FredHutch/seatrac-hackday-2024)
+Github link: [FredHutch/seatrac-hackday-2024](https://github.com/FredHutch/seatrac-hackday-2024)
 
 ## Agenda
 
