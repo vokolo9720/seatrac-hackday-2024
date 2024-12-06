@@ -1,7 +1,8 @@
 # SEATRAC TB Hackday 2024: Agenda
 
 Tuesday, December 10, 2024
-9 AM to 3 PM (EDT and PDT)
+9 AM to 3 PM EDT
+9 AM to 3 PM PDT
 
 ## Seattle:
 Fred Hutchinson Cancer Center
@@ -11,13 +12,15 @@ O’Mack Symposium Suite
 
 [FH Campus Map](https://www.fredhutch.org/en/about/contact-us/campus-map.html)
 
-## Emory:
-UPDATE LOCTION INFO HERE
+## Emory University:
+Emory Rollins School of Public Health
+Claudia Nance Rollins Building, Room 3001
+1518 Clifton Road NE, Atlanta, GA 30322
 
 
 ## Virtual:
 
-Zoom ([Zoom link, registration required](new_link_needed)). 
+Zoom ([Zoom link, registration required](https://us02web.zoom.us/j/82494563007?from=addon)). 
 
 Github link: [FredHutch/seatrac-hackday-2023](https://github.com/FredHutch/seatrac-hackday-2024)
 
