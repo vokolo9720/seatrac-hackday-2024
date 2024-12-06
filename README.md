@@ -6,17 +6,12 @@ Tuesday, December 10, 2024
 9 AM to 3 PM PDT
 
 ## Seattle:
-Fred Hutchinson Cancer Center
-Steam Plant Building
-O’Mack Symposium Suite
-1241 Eastlake Ave E, Seattle, WA 98102
+Fred Hutchinson Cancer Center, Steam Plant Building, O’Mack Symposium Suite, 1241 Eastlake Ave E, Seattle, WA 98102
 
 [FH Campus Map](https://www.fredhutch.org/en/about/contact-us/campus-map.html)
 
 ## Emory University:
-Emory Rollins School of Public Health
-Claudia Nance Rollins Building, Room 3001
-1518 Clifton Road NE, Atlanta, GA 30322
+Emory Rollins School of Public Health, Claudia Nance Rollins Building, Room 3001, 1518 Clifton Road NE, Atlanta, GA 30322
 
 ## Virtual:
 
