@@ -53,6 +53,13 @@ cd /home/processed_data
 unzip processed_data.zip
 ```
 
+To add users to the Rstudio app:
+```
+useradd -m USERNAME
+echo USERNAME:PASSWORD | chpasswd
+cp /etc/pam.d/login /etc/pam.d/rstudio
+```
+
 It may be helpful to stop and restart the RStudio server at some point.
 ```
 service --status-all
@@ -73,7 +80,7 @@ Use a launch template for quickly launching a new instance. The template `RStudi
 sudo yum update -y
 sudo yum -y install docker
 sudo service docker start
-sudo usermod -a -G docker ec2-user
+sudo usermod -a -G docker ssm-user # ec2-user or ssm-user
 sudo chkconfig docker on
 sudo docker pull afioregartland/hackday-rstudio
 ```
