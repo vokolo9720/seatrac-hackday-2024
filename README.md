@@ -24,9 +24,9 @@ Github link: [FredHutch/seatrac-hackday-2024](https://github.com/FredHutch/seatr
 The event will be starting in-person at Emory at 9 AM (EDT). Folks in Seattle will start in-person at 9 AM (PDT).
 There will be a JOINT Seattle/Emory session at 12 PM PDT / 3 PM EDT to share hackday progress.
 
-| Emory (EDT) | Seattle (PDT) | Activity |
+| Emory (EST) | Seattle (PST) | Activity |
 |-------------|---------------|----------|
-| 9:00 AM     |               | Alex Shalek presenting on correlates of protection for IV BCG and Mtb immunity in NHP (live) |
+| 9:00 AM     |               | Alex Shalek and Johsua Bromley presenting on correlates of protection for IV BCG and Mtb immunity in NHP (live) |
 | 9:45        |               | Opening remarks (Shuyi Ma, Andrew Fiore-Gartland) |
 | 10:00       |               | Small group session: devise questions, hypotheses and analysis plans |
 | 10:30       |               | Open hack time at Emory |
