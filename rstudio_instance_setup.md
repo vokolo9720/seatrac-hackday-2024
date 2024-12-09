@@ -92,6 +92,9 @@ sudo docker pull afioregartland/hackday-rstudio
  - `docker run -d -p 8787:8787 -e PASSWORD=dude97 --name hackday_rstudio afioregartland/hackday-rstudio:latest`
  - `docker exec -it hackday_rstudio /bin/bash`
  - `docker push afioregartland/hackday-rstudio:latest`
+ - `sudo swapoff -a` to turn off the swap and `sudo rm /swap` to remove it
+ - `df -h` and `sudo du -shx /* 2>/dev/null | sort -h` and `du -h`
+ - To expand the disk, you can Modify te EBS volume, then `sudo growpart /dev/nvme0n1 1` to grow a partition and `sudo xfs_growfs /` to grow the filesystem
 
 ## Unit test for `lme4` installation
 
