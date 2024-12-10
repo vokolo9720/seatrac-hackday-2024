@@ -290,7 +290,7 @@ Here we tether together the `group_by` , `group_split` and `purrr::map` to apply
 x = rmeta_tbl %>% 
   group_by(animalid, protect_outcome) %>% 
   tally() %>%
-  select(animalid, protect_outcome) %>% 
+  dplyr::select(animalid, protect_outcome) %>% 
   left_join(correlates_tbl, by = c("animalid"))
 
 xs = x %>% 
@@ -304,7 +304,7 @@ diffs$wilcox_p      = xs %>% purrr::map_dbl(.,~test_function(.x))
 diffs$variable_name = xs %>% purrr::map_chr(.,~.x[['key']][1])
 
 key_extra = correlates_tbl %>% group_by(key) %>% slice(1) %>%
-  select(key, short_key, tissue, unit, tp)
+  dplyr::select(key, short_key, tissue, unit, tp)
 
 diffs_tbl = diffs %>% left_join(key_extra, by = c("variable_name" = "key"))
 ```
