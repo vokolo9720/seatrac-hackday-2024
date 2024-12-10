@@ -11,6 +11,8 @@ editor:
 
 ## Data
 
+## Vera's version 12/10/2024
+
 This TB Hackday script uses (pre-processed) RNA sequencing data from Liu et al. and immune response data from Darrah et al. for NHP that were immunized using IV BCG:
 
 1.  [Liu et al. 2023](https://pubmed.ncbi.nlm.nih.gov/37390827/) (*Cell Rep Med*) **Blood transcriptional correlates of BCG-induced protection against tuberculosis in rhesus macaques**
