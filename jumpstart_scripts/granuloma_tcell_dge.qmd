@@ -103,7 +103,7 @@ meta_ss <- meta %>%
 
 # Ensure `ltpm` only includes columns for the filtered samples
 ltpm_ss <- ltpm %>%
-  select(all_of(rownames(meta_ss)))
+  dplyr::select(all_of(rownames(meta_ss)))
 
 mdf <- meta_ss %>%
   rownames_to_column("sampleid") %>%
@@ -288,7 +288,7 @@ plot_volcano(model_result = klm,
 ```
 
 
-## Visulize results for a single gene
+## Visualize results for a single gene
 
 ```{r}
 # Scatter-plot of Gene Expression vs. log-CFU
